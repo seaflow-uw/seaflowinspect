@@ -3,7 +3,13 @@ ui <- bslib::page_sidebar(
   sidebar = bslib::sidebar(
     shiny::selectInput("cruise", "Cruise", choices = sort(unique(all_data_source_files$cruise))),
     shiny::selectInput("variation", "Variation", choices = NULL),
-    shiny::checkboxGroupInput("exclude_flags", "Exclude flags", choices = NULL)
+    shiny::checkboxGroupInput("exclude_flags", "Exclude flags", choices = NULL),
+    shiny::hr(),
+    bslib::card(
+      bslib::card_header("Selection State"),
+      shiny::strong("Stat click x:"),
+      shiny::textOutput("selected_stat_x")
+    )
   ),
   bslib::navset_tab(
     bslib::nav_panel(
@@ -44,7 +50,7 @@ ui <- bslib::page_sidebar(
         bslib::card_header("Filter Params"),
         bslib::layout_columns(
           col_widths = c(3, 9),
-          shiny::uiOutput("filter_params_legend"),
+          shiny::div(),
           plotly::plotlyOutput("filter_params_plot", height = paste0(FILTER_PARAMS_PLOT_VH, "vh"))
         )
       )

@@ -1,5 +1,45 @@
 server <- function(input, output, session) {
   exclude_flags_selected <- reactiveVal(c("1", "2", "3"))
+  selected_stat_x <- reactiveVal(NULL)
+
+  clicked_stat_x <- reactive({
+    x <- selected_stat_x()
+    if (is.null(x)) {
+      return(NULL)
+    }
+
+    if (inherits(x, "POSIXt")) {
+      return(as.POSIXct(x))
+    }
+
+    parsed <- suppressWarnings(lubridate::ymd_hms(as.character(x), quiet = TRUE))
+    if (all(is.na(parsed))) {
+      parsed <- suppressWarnings(lubridate::ymd_hm(as.character(x), quiet = TRUE))
+    }
+    if (all(is.na(parsed))) {
+      return(NULL)
+    }
+
+    parsed[[1]]
+  })
+
+  clicked_stat_vline <- reactive({
+    x <- clicked_stat_x()
+    if (is.null(x)) {
+      return(NULL)
+    }
+
+    list(list(
+      type = "line",
+      x0 = x,
+      x1 = x,
+      y0 = 0,
+      y1 = 1,
+      xref = "x",
+      yref = "paper",
+      line = list(color = "#d62728", width = 1.5, dash = "dot")
+    ))
+  })
 
   # Keep server-side flag selection state in sync with user interaction.
   observeEvent(input$exclude_flags, ignoreInit = TRUE, {
@@ -104,18 +144,60 @@ server <- function(input, output, session) {
 
     validate(need(nrow(df) > 0, "No rows to plot for current filters."))
 
-    plot_ly(
+    p <- plot_ly(
       data = df,
       x = ~time,
       y = as.formula(paste0("~", input$stat_metric)),
       type = "scatter",
       mode = "markers",
-      marker = list(size = 3)
+      marker = list(size = 3),
+      source = "stat_plot_click"
     ) |>
       layout(
         xaxis = list(title = "Time", range = shared_x_range()),
-        yaxis = list(title = metric_label)
+        yaxis = list(title = metric_label),
+        shapes = clicked_stat_vline()
       )
+
+    # We intentionally accept an occasional startup warning from
+    # plotly::event_data("plotly_click", source = "stat_plot_click"):
+    # "...event tied a source ID ... is not registered".
+    #
+    # During initial reactive churn, event_data() can execute before client-side
+    # event registration has fully settled for this source. This is benign,
+    # click interactivity works after first render, and no incorrect data is
+    # produced. This is a timing warning, not a logic error.
+    #
+    # We will not suppress or fix this warning, as robust suppression or
+    # internal-state workarounds add maintenance complexity and couple us to
+    # non-public internals. For this project, keeping code simple is preferred.
+    plotly::event_register(p, "plotly_click")
+  })
+
+  stat_click_event <- reactive({
+    plotly::event_data(
+      "plotly_click",
+      source = "stat_plot_click",
+      priority = "event"
+    )
+  })
+
+  observeEvent(stat_click_event(), {
+    click <- stat_click_event()
+    if (!is.null(click) && nrow(click) > 0 && !is.null(click$x)) {
+      selected_stat_x(click$x[[1]])
+    }
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  output$selected_stat_x <- renderText({
+    x <- selected_stat_x()
+    if (is.null(x)) {
+      "None"
+    } else if (inherits(x, "POSIXt")) {
+      format(x, "%Y-%m-%d %H:%M:%S %Z")
+    } else {
+      as.character(x)
+    }
   })
 
   output$sfl_plot <- renderPlotly({
@@ -134,34 +216,9 @@ server <- function(input, output, session) {
     ) |>
       layout(
         xaxis = list(title = "Time", range = shared_x_range()),
-        yaxis = list(title = input$sfl_metric)
+        yaxis = list(title = input$sfl_metric),
+        shapes = clicked_stat_vline()
       )
-  })
-
-  output$filter_params_legend <- renderUI({
-    legend_items <- list(
-      list(label = "beads_fsc_small", color = "#1f77b4"),
-      list(label = "beads_D1", color = "#ff7f0e"),
-      list(label = "beads_D2", color = "#2ca02c")
-    )
-
-    tags$div(
-      style = "padding-top: 0.5rem;",
-      tags$h5("Legend"),
-      lapply(legend_items, function(item) {
-        tags$div(
-          style = "display:flex; align-items:center; margin-bottom:0.5rem;",
-          tags$span(
-            style = paste0(
-              "display:inline-block; width:18px; height:4px; margin-right:8px; background:",
-              item$color,
-              ";"
-            )
-          ),
-          tags$span(item$label)
-        )
-      })
-    )
   })
 
   output$filter_params_plot <- renderPlotly({
@@ -175,7 +232,7 @@ server <- function(input, output, session) {
         mutate(y_value = .data[[col_name]]) |>
         filter(!is.na(start_date), !is.na(end_date), !is.na(y_value))
 
-      plot_ly(plot_df) |>
+      p <- plot_ly(plot_df) |>
         add_segments(
           x = ~start_date,
           xend = ~end_date,
@@ -191,13 +248,39 @@ server <- function(input, output, session) {
             ": %{y}<extra></extra>"
           ),
           line = list(width = 3, color = color)
-        ) |>
+        )
+
+      vx <- clicked_stat_x()
+      if (!is.null(vx) && nrow(plot_df) > 0) {
+        y_min <- min(plot_df$y_value, na.rm = TRUE)
+        y_max <- max(plot_df$y_value, na.rm = TRUE)
+        if (is.finite(y_min) && is.finite(y_max)) {
+          if (y_min == y_max) {
+            y_min <- y_min - 0.5
+            y_max <- y_max + 0.5
+          }
+          p <- p |>
+            add_segments(
+              data = tibble::tibble(x0 = vx, x1 = vx, y0 = y_min, y1 = y_max),
+              x = ~x0,
+              xend = ~x1,
+              y = ~y0,
+              yend = ~y1,
+              inherit = FALSE,
+              showlegend = FALSE,
+              hoverinfo = "skip",
+              line = list(color = "#d62728", width = 1.5, dash = "dot")
+            )
+        }
+      }
+
+      p |>
         layout(yaxis = list(title = y_title))
     }
 
-    p1 <- make_segment_plot("beads_fsc_small", "beads_fsc_small", "#1f77b4")
-    p2 <- make_segment_plot("beads_D1", "beads_D1", "#ff7f0e")
-    p3 <- make_segment_plot("beads_D2", "beads_D2", "#2ca02c")
+    p1 <- make_segment_plot("beads_fsc_small", "FSC", "#1f77b4")
+    p2 <- make_segment_plot("beads_D1", "D1", "#ff7f0e")
+    p3 <- make_segment_plot("beads_D2", "D2", "#2ca02c")
 
     subplot(p1, p2, p3, nrows = 3, shareX = TRUE, titleY = TRUE) |>
       layout(

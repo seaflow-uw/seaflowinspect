@@ -1,1 +1,1 @@
-A projec to explore SeaFlow data through interactive visualizations.
+A project to explore SeaFlow data through interactive visualizations.
