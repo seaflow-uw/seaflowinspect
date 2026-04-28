@@ -1,14 +1,14 @@
 read_parquet_duckdb <- function(path) {
-  con <- dbConnect(duckdb())
-  on.exit(dbDisconnect(con, shutdown = TRUE))
-  dbGetQuery(con, glue("SELECT * FROM read_parquet('{path}')")) |>
-    as_tibble()
+  con <- DBI::dbConnect(duckdb::duckdb())
+  on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
+  DBI::dbGetQuery(con, glue::glue("SELECT * FROM read_parquet('{path}')")) |>
+    tibble::as_tibble()
 }
 
 read_sfl_table <- function(db_file) {
   popcycle::get_sfl_table(db_file, outlier_join = TRUE) |>
-    as_tibble() |>
-    select(
+    tibble::as_tibble() |>
+    dplyr::select(
       date,
       lat,
       lon,
@@ -20,20 +20,20 @@ read_sfl_table <- function(db_file) {
       event_rate,
       flag
     ) |>
-    rename(
+    dplyr::rename(
       time = date
     ) |>
-    mutate(
+    dplyr::mutate(
       lat = as.numeric(lat),
       lon = as.numeric(lon)
     ) |>
-    arrange(time)
+    dplyr::arrange(time)
 }
 
 read_stat_file <- function(stat_file) {
   read_parquet_duckdb(stat_file) |>
-    filter(quantile == QUANTILE) |>
-    select(
+    dplyr::filter(quantile == QUANTILE) |>
+    dplyr::select(
       time,
       pop,
       opp_evt_ratio,
@@ -41,22 +41,38 @@ read_stat_file <- function(stat_file) {
       glue("diam_{REFRAC}_med"),
       flag
     ) |>
-    rename(
+    dplyr::rename(
       diameter = glue("diam_{REFRAC}_med")
     ) |>
-    mutate(time = lubridate::ymd_hms(time, quiet = TRUE)) |>
-    arrange(time)
+    dplyr::mutate(time = lubridate::ymd_hms(time, quiet = TRUE)) |>
+    dplyr::arrange(time)
 }
 
 read_filter_params <- function(db_file, max_date = NULL) {
+  normalize_datetime <- function(x) {
+    if (inherits(x, "POSIXt")) {
+      return(as.POSIXct(x))
+    }
+
+    if (is.numeric(x)) {
+      return(lubridate::as_datetime(x))
+    }
+
+    out <- suppressWarnings(lubridate::ymd_hms(x, quiet = TRUE))
+    if (all(is.na(out))) {
+      out <- suppressWarnings(lubridate::ymd_hm(x, quiet = TRUE))
+    }
+    out
+  }
+
   fp <- popcycle::get_filter_table(db_file) |>
-    filter(quantile == QUANTILE) |>
-    select(-date) |>
+    dplyr::filter(quantile == QUANTILE) |>
+    dplyr::select(-date) |>
     tibble::as_tibble()
   plan <- popcycle::get_filter_plan_table(db_file) |>
-    mutate(start_date = lubridate::ymd_hms(start_date, quiet = TRUE)) |>
-    arrange(start_date) |>
-    mutate(end_date = dplyr::lead(start_date)) |>
+    dplyr::mutate(start_date = normalize_datetime(start_date)) |>
+    dplyr::arrange(start_date) |>
+    dplyr::mutate(end_date = dplyr::lead(start_date)) |>
     tibble::as_tibble()
 
   out <- dplyr::left_join(plan, fp, by = c("filter_id" = "id"))

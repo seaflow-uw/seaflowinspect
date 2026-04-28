@@ -1,6 +1,6 @@
 #' Find all <cruise> stat parquet and outlier db files
 list_data_source_files <- function(data_sources) {
-  pmap(data_sources, function(name, dirs) {
+  purrr::pmap(data_sources, function(name, dirs) {
     stat_files <- list.files(
       file.path(dirs, "results"),
       pattern = "\\.stat\\.parquet$",
@@ -16,7 +16,7 @@ list_data_source_files <- function(data_sources) {
     )
 
     if (length(stat_files) == 0 && length(outlier_dbs) == 0) {
-      return(tibble(
+      return(tibble::tibble(
         name = character(),
         cruise = character(),
         stat_file = character(),
@@ -24,21 +24,21 @@ list_data_source_files <- function(data_sources) {
       ))
     }
 
-    stat_tbl <- tibble(
+    stat_tbl <- tibble::tibble(
       name = name,
       cruise = basename(dirname(stat_files)),
       stat_file = stat_files
     )
 
-    outlier_tbl <- tibble(
+    outlier_tbl <- tibble::tibble(
       name = name,
       cruise = basename(dirname(outlier_dbs)),
       outlier_db = outlier_dbs
     )
 
-    full_join(stat_tbl, outlier_tbl, by = c("name", "cruise"))
+    dplyr::full_join(stat_tbl, outlier_tbl, by = c("name", "cruise"))
   }) |>
-    list_rbind()
+    purrr::list_rbind()
 }
 
 all_data_source_files <- list_data_source_files(data_sources)

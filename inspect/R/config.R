@@ -1,5 +1,7 @@
 # App configuration
-PLOT_VH <- 45
+SFL_PLOT_VH <- 20
+STAT_PLOT_VH <- 20
+FILTER_PARAMS_PLOT_VH <- 20
 QUANTILE <- 50
 REFRAC <- "mid"
 
