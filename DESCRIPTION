@@ -1,0 +1,14 @@
+Package: seaflowinspect
+Type: Shiny
+Title: SeaFlow Inspect
+Version: 0.1.0
+Imports:
+    arrow,
+    duckdb,
+    shiny,
+    bslib,
+    tidyverse,
+    glue,
+    plotly,
+    watcher,
+    DT
