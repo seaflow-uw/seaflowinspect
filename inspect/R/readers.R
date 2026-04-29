@@ -86,3 +86,8 @@ read_filter_params <- function(db_file, max_date = NULL) {
 
   out
 }
+
+read_bead_sample <- function(bead_file) {
+  read_parquet_duckdb(bead_file) |>
+    dplyr::rename(time = date)
+}

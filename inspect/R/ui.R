@@ -7,7 +7,7 @@ ui <- bslib::page_sidebar(
     shiny::hr(),
     bslib::card(
       bslib::card_header("Selection State"),
-      shiny::strong("Stat click x:"),
+      shiny::strong("Stat x:"),
       shiny::textOutput("selected_stat_x")
     )
   ),
@@ -58,8 +58,22 @@ ui <- bslib::page_sidebar(
     bslib::nav_panel(
       "Context",
       bslib::card(
-        bslib::card_header("Contextual Plots"),
-        shiny::p("Context plots will appear here.")
+        bslib::card_header("Bead Events (Selected Stat Hour)"),
+        bslib::layout_columns(
+          col_widths = c(3, 9),
+          shiny::div(
+            shiny::p("Click a point in the Stat plot to load bead events for that hour."),
+            shiny::sliderInput(
+              inputId = "bead_hex_bins",
+              label = "Hex bins",
+              min = 10,
+              max = 200,
+              value = 110,
+              step = 5
+            )
+          ),
+          shiny::plotOutput("bead_hex_plot", height = "70vh")
+        )
       )
     )
   )
