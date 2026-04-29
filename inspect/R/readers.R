@@ -1,7 +1,22 @@
-read_parquet_duckdb <- function(path) {
+read_parquet_duckdb <- function(path, select_cols = NULL, where_clause = NULL) {
   con <- DBI::dbConnect(duckdb::duckdb())
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
-  DBI::dbGetQuery(con, glue::glue("SELECT * FROM read_parquet('{path}')")) |>
+
+  quoted_path <- gsub("'", "''", path, fixed = TRUE)
+
+  select_sql <- "*"
+  if (!is.null(select_cols) && length(select_cols) > 0) {
+    select_sql <- paste(DBI::dbQuoteIdentifier(con, select_cols), collapse = ", ")
+  }
+
+  where_sql <- ""
+  if (!is.null(where_clause) && nzchar(where_clause)) {
+    where_sql <- glue::glue(" WHERE {where_clause}")
+  }
+
+  query <- glue::glue("SELECT {select_sql} FROM read_parquet('{quoted_path}'){where_sql}")
+
+  DBI::dbGetQuery(con, query) |>
     tibble::as_tibble()
 }
 
@@ -89,5 +104,72 @@ read_filter_params <- function(db_file, max_date = NULL) {
 
 read_bead_sample <- function(bead_file) {
   read_parquet_duckdb(bead_file) |>
+    dplyr::rename(time = date) |>
+    dplyr::select(-file_id)
+}
+
+parse_vct_file_hour <- function(vct_file) {
+  ts_txt <- sub("\\..*$", "", basename(vct_file))
+  ts_rfc3339 <- sub(
+    "^(.+T\\d{2})-(\\d{2})-(\\d{2})([+-]\\d{2})-(\\d{2})$",
+    "\\1:\\2:\\3\\4:\\5",
+    ts_txt
+  )
+
+  parsed <- suppressWarnings(lubridate::ymd_hms(ts_rfc3339, quiet = TRUE))
+  if (all(is.na(parsed))) {
+    return(as.POSIXct(NA))
+  }
+
+  # Canonicalize to UTC so filename hours with different offsets can be
+  # compared deterministically against selected UTC hour values.
+  lubridate::with_tz(parsed[[1]], tzone = "UTC")
+}
+
+resolve_vct_file_for_hour <- function(vct_dir, hour) {
+  vct_files <- list.files(vct_dir, pattern = "\\.vct\\.parquet$", full.names = TRUE)
+  if (length(vct_files) == 0) {
+    stop(glue::glue("No VCT parquet files found in directory: {vct_dir}"))
+  }
+
+  target_hour <- lubridate::floor_date(
+    lubridate::with_tz(as.POSIXct(hour), tzone = "UTC"),
+    unit = "hour"
+  )
+  file_hours <- vapply(vct_files, parse_vct_file_hour, FUN.VALUE = as.POSIXct(NA), USE.NAMES = FALSE)
+  matches <- vct_files[!is.na(file_hours) & file_hours == target_hour]
+
+  if (length(matches) == 0) {
+    stop(glue::glue("No VCT file matches selected UTC hour {format(target_hour, '%Y-%m-%dT%H:%M:%SZ')} in {vct_dir}"))
+  }
+
+  if (length(matches) > 1) {
+    stop(glue::glue("Multiple VCT files match selected UTC hour {format(target_hour, '%Y-%m-%dT%H:%M:%SZ')} in {vct_dir}"))
+  }
+
+  matches[[1]]
+}
+
+read_vct_parquet <- function(vct_dir, hour) {
+  vct_file <- resolve_vct_file_for_hour(vct_dir, hour)
+  cols <- c(
+    "date",
+    glue::glue("pop_q{QUANTILE}"),
+    "D1",
+    "D2",
+    "fsc_small",
+    "chl_small",
+    "pe",
+    glue::glue("diam_{REFRAC}_q{QUANTILE}"),
+    glue::glue("Qc_{REFRAC}_q{QUANTILE}"),
+    "filter_id",
+    "gating_id"
+  )
+
+  read_parquet_duckdb(
+    vct_file,
+    select_cols = cols,
+    where_clause = glue::glue("q{QUANTILE} = TRUE")
+  ) |>
     dplyr::rename(time = date)
 }

@@ -8,7 +8,10 @@ ui <- bslib::page_sidebar(
     bslib::card(
       bslib::card_header("Selection State"),
       shiny::strong("Stat x:"),
-      shiny::textOutput("selected_stat_x")
+      shiny::textOutput("selected_stat_x"),
+      shiny::hr(),
+      shiny::strong("VCT first row:"),
+      shiny::textOutput("vct_first_row")
     )
   ),
   bslib::navset_tab(
@@ -56,9 +59,9 @@ ui <- bslib::page_sidebar(
       )
     ),
     bslib::nav_panel(
-      "Context",
+      "Filter",
       bslib::card(
-        bslib::card_header("Bead Events (Selected Stat Hour)"),
+        bslib::card_header("Bead Subsample (Selected Stat Hour)"),
         bslib::layout_columns(
           col_widths = c(3, 9),
           shiny::div(
@@ -72,8 +75,17 @@ ui <- bslib::page_sidebar(
               step = 5
             )
           ),
-          shiny::plotOutput("bead_hex_plot", height = "70vh")
+          shiny::plotOutput("bead_evt_hex_plot", height = paste0(FILTER_PLOT_VH, "vh")),
+          shiny::div(),  # placeholder
+          shiny::plotOutput("bead_opp_hex_plot", height = paste0(FILTER_PLOT_VH, "vh"))
         )
+      )
+    ),
+    bslib::nav_panel(
+      "Gating",
+      bslib::card(
+        bslib::card_header("Gating"),
+        shiny::p("Gating views will appear here.")
       )
     )
   )

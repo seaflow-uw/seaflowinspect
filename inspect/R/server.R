@@ -8,7 +8,7 @@ server <- function(input, output, session) {
     }
 
     if (inherits(x, "POSIXt")) {
-      return(as.POSIXct(x))
+      return(lubridate::with_tz(as.POSIXct(x), tzone = "UTC"))
     }
 
     if (is.numeric(x)) {
@@ -23,7 +23,7 @@ server <- function(input, output, session) {
       return(NULL)
     }
 
-    parsed[[1]]
+    lubridate::with_tz(parsed[[1]], tzone = "UTC")
   }
 
   clicked_stat_x <- reactive({
@@ -105,6 +105,12 @@ server <- function(input, output, session) {
     read_bead_sample(selected_files()$bead_file[[1]])
   })
 
+  vct_data <- reactive({
+    req(!is.na(selected_files()$vct_dir[[1]]))
+    req(!is.null(clicked_stat_x()))
+    read_vct_parquet(selected_files()$vct_dir[[1]], clicked_stat_x())
+  })
+
   # Update population choices when data changes, preserving selection if possible
   observe({
     pops <- sort(unique(stat_data()$pop))
@@ -150,7 +156,27 @@ server <- function(input, output, session) {
     c(min(df$time, na.rm = TRUE), max(df$time, na.rm = TRUE))
   })
 
-  filtered_bead_evt_data <- reactive({
+  active_bead_filter_params <- reactive({
+    ts <- clicked_stat_x()
+    req(!is.null(ts))
+
+    fp <- filter_params_data()
+    validate(need(
+      all(c(
+        "start_date", "end_date", "beads_fsc_small", "beads_D1", "beads_D2",
+        "notch_small_D1", "offset_small_D1", "notch_small_D2", "offset_small_D2",
+        "notch_large_D1", "offset_large_D1", "notch_large_D2", "offset_large_D2",
+        "width"
+      ) %in% names(fp)),
+      "Filter params are missing required columns for bead guide lines."
+    ))
+
+    fp |>
+      dplyr::filter(start_date <= ts, is.na(end_date) | ts < end_date) |>
+      dplyr::slice_tail(n = 1)
+  })
+
+  time_filtered_bead_evt_data <- reactive({
     df <- bead_evt_data()
     validate(need("time" %in% names(df), "Bead event data is missing 'time' column."))
     validate(need(inherits(df$time, "POSIXt"), "Bead event time must be POSIXt."))
@@ -166,28 +192,25 @@ server <- function(input, output, session) {
     df
   })
 
-  active_bead_filter_params <- reactive({
-    ts <- clicked_stat_x()
-    req(!is.null(ts))
+  time_filtered_bead_opp_data <- reactive({
+    df <- time_filtered_bead_evt_data()
 
-    fp <- filter_params_data()
-    validate(need(
-      all(c(
-        "start_date", "end_date", "beads_fsc_small", "beads_D1", "beads_D2",
-        "notch_small_D1", "offset_small_D1", "notch_small_D2", "offset_small_D2",
-        "notch_large_D1", "offset_large_D1", "notch_large_D2", "offset_large_D2"
-      ) %in% names(fp)),
-      "Filter params are missing required columns for bead guide lines."
-    ))
+    fp <- active_bead_filter_params() |>
+      dplyr::rename_with(~gsub("_", ".", .x, fixed = TRUE))
 
-    fp |>
-      dplyr::filter(start_date <= ts, is.na(end_date) | ts < end_date) |>
-      dplyr::slice_tail(n = 1)
+    # Filter params have been filtered down to one quantile. Add rows for the
+    # other quantiles for compatilibity with the popcycle::filter_evt function,
+    # which expects all quantiles to be present in params.
+    fp <- dplyr::bind_rows(list(fp, fp, fp))
+    fp$quantile <- popcycle:::QUANTILES
+
+    df <- popcycle::filter_evt(df, fp) |>
+      dplyr::filter(.data[[glue::glue("q{QUANTILE}")]] == TRUE)
   })
 
-  output$bead_hex_plot <- renderPlot({
+  output$bead_evt_hex_plot <- renderPlot({
     req(input$bead_hex_bins)
-    df <- filtered_bead_evt_data()
+    df <- time_filtered_bead_evt_data()
 
     validate(need(!is.null(selected_stat_x()), "Click a point in the Stat plot to view bead events."))
     validate(need(nrow(df) > 0, "No bead events found for the selected hour."))
@@ -331,7 +354,197 @@ server <- function(input, output, session) {
       ggplot2::labs(
         x = "FSC Small",
         y = NULL,
-        title = "Bead Events",
+        title = "Bead Subsample EVT",
+        subtitle = "Filtered to the hour of the selected Stat point"
+      ) +
+      ggplot2::theme_minimal(base_size = 12)
+
+    if (nrow(vline_df) > 0) {
+      p <- p +
+        ggplot2::geom_vline(
+          data = vline_df,
+          ggplot2::aes(xintercept = xintercept),
+          inherit.aes = FALSE,
+          color = "#d62728",
+          linetype = "dashed",
+          linewidth = 0.6
+        )
+    }
+
+    if (nrow(hline_df) > 0) {
+      p <- p +
+        ggplot2::geom_hline(
+          data = hline_df,
+          ggplot2::aes(yintercept = yintercept),
+          inherit.aes = FALSE,
+          color = "#d62728",
+          linetype = "dashed",
+          linewidth = 0.6
+        )
+    }
+
+    if (nrow(abline_segment_df) > 0) {
+      p <- p +
+        ggplot2::geom_segment(
+          data = abline_segment_df,
+          ggplot2::aes(x = x_start, xend = x_end, y = y_start, yend = y_end),
+          inherit.aes = FALSE,
+          color = "#cc00cc",
+          linewidth = 0.7,
+          show.legend = FALSE
+        )
+    }
+
+    p
+  })
+
+  output$bead_opp_hex_plot <- renderPlot({
+    req(input$bead_hex_bins)
+    df <- time_filtered_bead_opp_data()
+
+    validate(need(!is.null(selected_stat_x()), "Click a point in the Stat plot to view bead events."))
+    validate(need(nrow(df) > 0, "No bead events found for the selected hour."))
+    validate(need(
+      all(c("fsc_small", "chl_small", "pe", "D1", "D2") %in% names(df)),
+      "Bead event data is missing one or more required columns: fsc_small, chl_small, pe, D1, D2."
+    ))
+
+    if (!requireNamespace("hexbin", quietly = TRUE)) {
+      validate(need(FALSE, "Package 'hexbin' is required for geom_hex. Install it to display this plot."))
+    }
+
+    panel_levels <- c("chl_small", "pe", "D1", "D2")
+    panel_labels <- c(
+      "chl_small vs fsc_small",
+      "pe vs fsc_small",
+      "D1 vs fsc_small",
+      "D2 vs fsc_small"
+    )
+
+    plot_df <- df |>
+      dplyr::select(fsc_small, chl_small, pe, D1, D2) |>
+      tidyr::pivot_longer(
+        cols = c(chl_small, pe, D1, D2),
+        names_to = "y_var",
+        values_to = "y_value"
+      ) |>
+      dplyr::mutate(
+        panel = factor(
+          y_var,
+          levels = panel_levels,
+          labels = panel_labels
+        )
+      ) |>
+      dplyr::filter(!is.na(fsc_small), !is.na(y_value))
+
+    validate(need(nrow(plot_df) > 0, "No bead rows available to plot after filtering missing values."))
+
+    fp <- active_bead_filter_params()
+
+    vline_df <- tibble::tibble()
+    hline_df <- tibble::tibble()
+    abline_segment_df <- tibble::tibble()
+    if (nrow(fp) > 0) {
+      if (!is.na(fp$beads_fsc_small[[1]])) {
+        vline_df <- tibble::tibble(
+          panel = factor(panel_labels, levels = panel_labels),
+          xintercept = fp$beads_fsc_small[[1]]
+        )
+      }
+
+      hline_df <- tibble::tibble(
+        panel = factor(c("D1 vs fsc_small", "D2 vs fsc_small"), levels = panel_labels),
+        yintercept = c(fp$beads_D1[[1]], fp$beads_D2[[1]])
+      ) |>
+        dplyr::filter(!is.na(yintercept))
+
+      abline_df <- tibble::tibble(
+        panel = factor(
+          c(
+            "D1 vs fsc_small", "D2 vs fsc_small",
+            "D1 vs fsc_small", "D2 vs fsc_small"
+          ),
+          levels = panel_labels
+        ),
+        slope = c(
+          fp$notch_small_D1[[1]],
+          fp$notch_small_D2[[1]],
+          fp$notch_large_D1[[1]],
+          fp$notch_large_D2[[1]]
+        ),
+        intercept = c(
+          fp$offset_small_D1[[1]],
+          fp$offset_small_D2[[1]],
+          fp$offset_large_D1[[1]],
+          fp$offset_large_D2[[1]]
+        ),
+        line_kind = c("small", "small", "large", "large")
+      ) |>
+        dplyr::filter(!is.na(slope), is.finite(slope), !is.na(intercept), is.finite(intercept))
+
+      panel_ranges <- plot_df |>
+        dplyr::filter(panel %in% c("D1 vs fsc_small", "D2 vs fsc_small")) |>
+        dplyr::group_by(panel) |>
+        dplyr::summarise(
+          x_min = min(fsc_small, na.rm = TRUE),
+          x_max = max(fsc_small, na.rm = TRUE),
+          .groups = "drop"
+        )
+
+      abline_segment_df <- abline_df |>
+        dplyr::inner_join(panel_ranges, by = "panel") |>
+        dplyr::group_by(panel) |>
+        dplyr::group_modify(~{
+          panel_lines <- .x
+          small <- panel_lines |> dplyr::filter(line_kind == "small")
+          large <- panel_lines |> dplyr::filter(line_kind == "large")
+          if (nrow(small) != 1 || nrow(large) != 1) {
+            return(tibble::tibble())
+          }
+
+          x_min <- panel_lines$x_min[[1]]
+          x_max <- panel_lines$x_max[[1]]
+          m_small <- small$slope[[1]]
+          b_small <- small$intercept[[1]]
+          m_large <- large$slope[[1]]
+          b_large <- large$intercept[[1]]
+
+          x_int <- if (isTRUE(all.equal(m_small, m_large))) {
+            NA_real_
+          } else {
+            (b_large - b_small) / (m_small - m_large)
+          }
+
+          split_x <- if (is.na(x_int)) {
+            x_min
+          } else {
+            min(max(x_int, x_min), x_max)
+          }
+
+          tibble::tibble(
+            line_kind = c("small", "large"),
+            slope = c(m_small, m_large),
+            intercept = c(b_small, b_large),
+            x_start = c(x_min, split_x),
+            x_end = c(split_x, x_max)
+          )
+        }) |>
+        dplyr::ungroup() |>
+        dplyr::filter(x_end > x_start) |>
+        dplyr::mutate(
+          y_start = slope * x_start + intercept,
+          y_end = slope * x_end + intercept
+        )
+    }
+
+    p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = fsc_small, y = y_value)) +
+      ggplot2::geom_hex(bins = input$bead_hex_bins) +
+      ggplot2::scale_fill_viridis_c(trans = "log10", name = "Count") +
+      ggplot2::facet_wrap(~panel, ncol = 2, scales = "free_y") +
+      ggplot2::labs(
+        x = "FSC Small",
+        y = NULL,
+        title = "Bead Subsample OPP",
         subtitle = "Filtered to the hour of the selected Stat point"
       ) +
       ggplot2::theme_minimal(base_size = 12)
@@ -441,6 +654,24 @@ server <- function(input, output, session) {
     } else {
       format(x, "%Y-%m-%d %H:%M:%S %Z")
     }
+  })
+
+  output$vct_first_row <- renderText({
+    if (is.null(clicked_stat_x())) {
+      return("Click a Stat point to load VCT hour.")
+    }
+
+    vdir <- selected_files()$vct_dir[[1]]
+    if (is.na(vdir)) {
+      return("No VCT directory for selected variation.")
+    }
+
+    df <- tryCatch(vct_data(), error = function(e) NULL)
+    if (is.null(df) || nrow(df) == 0) {
+      return("No VCT rows for selected hour.")
+    }
+
+    paste(capture.output(print(df[1, , drop = FALSE], width = 120)), collapse = " ")
   })
 
   output$sfl_plot <- renderPlotly({
