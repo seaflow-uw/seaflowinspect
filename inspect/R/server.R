@@ -105,6 +105,18 @@ server <- function(input, output, session) {
     )
   })
 
+  # Read selected gating parameters and cap final plan end_date at the
+  # last available SFL timestamp.
+  gating_params_data <- reactive({
+    req(!is.na(selected_files()$outlier_db[[1]]))
+    sfl_df <- sfl_data()
+
+    read_gating_params(
+      selected_files()$outlier_db[[1]],
+      max_date = max(sfl_df$time, na.rm = TRUE)
+    )
+  })
+
   bead_evt_data <- reactive({
     req(!is.na(selected_files()$bead_file[[1]]))
     read_bead_sample(selected_files()$bead_file[[1]])
@@ -179,6 +191,27 @@ server <- function(input, output, session) {
     fp |>
       dplyr::filter(start_date <= ts, is.na(end_date) | ts < end_date) |>
       dplyr::slice_tail(n = 1)
+  })
+
+  active_gating_params <- reactive({
+    ts <- clicked_stat_x()
+    req(!is.null(ts))
+
+    gp <- gating_params_data()
+
+    # Get gating params for selected stat point
+    gp$gating <- gp$gating |>
+      dplyr::filter(start_date <= ts, is.na(end_date) | ts < end_date)
+    if (length(unique(gp$gating$id)) > 1) {
+      stop(glue::glue("Multiple active gating parameter sets found for selected Stat point (timestamp {ts})."))
+    }
+    gp$gating <- gp$gating
+
+    # Filter poly down to those matching id
+    gp$poly <- gp$poly |>
+      dplyr::filter(gating_id %in% gp$gating$id)
+
+    gp
   })
 
   time_filtered_bead_evt_data <- reactive({
@@ -763,13 +796,47 @@ server <- function(input, output, session) {
       )
   })
 
-  output$vct_plot <- renderPlot({
+  # output$vct_plot <- renderPlot({
+  #   df <- vct_data()
+  #   validate(need(nrow(df) > 0, "No VCT data for selected hour."))
+  #   plot_vct_cytogram(df, x = "fsc_small", y = "pe")
+  #   # popcycle::plot_vct_cytogram(
+  #   #   df,
+  #   #   para.x = "fsc_small",
+  #   #   para.y = "pe"
+  #   # )
+  # })
+
+  output$vct_plot_pe_fsc_small <- renderPlot({
     df <- vct_data()
     validate(need(nrow(df) > 0, "No VCT data for selected hour."))
-    popcycle::plot_vct_cytogram(
-      df,
-      para.x = "fsc_small",
-      para.y = "pe"
-    )
+
+    gp <- active_gating_params()
+    validate(need(nrow(gp$gating) > 0, "No active gating parameters found for selected Stat point."))
+    validate(need(nrow(gp$poly) > 0, "No active gating polygon parameters found for selected Stat point."))
+
+    plot_vct_cytogram(df, x = "fsc_small", y = "pe", gating_params = gp)
+  })
+
+  output$vct_plot_chl_small_fsc_small <- renderPlot({
+    df <- vct_data()
+    validate(need(nrow(df) > 0, "No VCT data for selected hour."))
+
+    gp <- active_gating_params()
+    validate(need(nrow(gp$gating) > 0, "No active gating parameters found for selected Stat point."))
+    validate(need(nrow(gp$poly) > 0, "No active gating polygon parameters found for selected Stat point."))
+
+    plot_vct_cytogram(df, x = "fsc_small", y = "chl_small", gating_params = gp)
+  })
+
+  output$vct_plot_pe_chl_small <- renderPlot({
+    df <- vct_data()
+    validate(need(nrow(df) > 0, "No VCT data for selected hour."))
+
+    gp <- active_gating_params()
+    validate(need(nrow(gp$gating) > 0, "No active gating parameters found for selected Stat point."))
+    validate(need(nrow(gp$poly) > 0, "No active gating polygon parameters found for selected Stat point."))
+
+    plot_vct_cytogram(df, x = "chl_small", y = "pe", gating_params = gp)
   })
 }

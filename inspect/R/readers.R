@@ -90,16 +90,57 @@ read_filter_params <- function(db_file, max_date = NULL) {
     dplyr::mutate(end_date = dplyr::lead(start_date)) |>
     tibble::as_tibble()
 
-  out <- dplyr::left_join(plan, fp, by = c("filter_id" = "id"))
-
-  if (!is.null(max_date) && nrow(out) > 0) {
-    last_idx <- nrow(out)
-    if (is.na(out$end_date[[last_idx]])) {
-      out$end_date[[last_idx]] <- max_date
+  if (!is.null(max_date) && nrow(plan) > 0) {
+    last_idx <- nrow(plan)
+    if (is.na(plan$end_date[[last_idx]])) {
+      plan$end_date[[last_idx]] <- max_date
     }
   }
 
+  out <- dplyr::left_join(plan, fp, by = c("filter_id" = "id"))
+
   out
+}
+
+read_gating_params <- function(db_file, max_date = NULL) {
+  normalize_datetime <- function(x) {
+    if (inherits(x, "POSIXt")) {
+      return(as.POSIXct(x))
+    }
+
+    if (is.numeric(x)) {
+      return(lubridate::as_datetime(x))
+    }
+
+    out <- suppressWarnings(lubridate::ymd_hms(x, quiet = TRUE))
+    if (all(is.na(out))) {
+      out <- suppressWarnings(lubridate::ymd_hm(x, quiet = TRUE))
+    }
+    out
+  }
+
+  gating_tbl <- popcycle::get_gating_table(db_file) |>
+    tibble::as_tibble()
+  poly_tbl <- popcycle::get_poly_table(db_file) |>
+    tibble::as_tibble()
+  plan_tbl <- popcycle::get_gating_plan_table(db_file) |>
+    dplyr::mutate(start_date = normalize_datetime(start_date)) |>
+    dplyr::arrange(start_date) |>
+    dplyr::mutate(end_date = dplyr::lead(start_date)) |>
+    tibble::as_tibble()
+  if (!is.null(max_date) && nrow(plan_tbl) > 0) {
+    last_idx <- nrow(plan_tbl)
+    if (is.na(plan_tbl$end_date[[last_idx]])) {
+      plan_tbl$end_date[[last_idx]] <- max_date
+    }
+  }
+
+  gating_tbl <- dplyr::left_join(gating_tbl, plan_tbl, by = c("id" = "gating_id"))
+
+  list(
+    gating = gating_tbl,
+    poly = poly_tbl
+  )
 }
 
 read_bead_sample <- function(bead_file) {

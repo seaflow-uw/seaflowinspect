@@ -73,9 +73,20 @@ ui <- bslib::page_sidebar(
     ),
     bslib::nav_panel(
       "Gating",
-      bslib::card(
-        bslib::card_header("Gating"),
-        shiny::plotOutput("vct_plot", height = "40vh")
+      bslib::layout_columns(
+        col_widths = c(6, 6),
+        bslib::card(
+          bslib::card_header("pe vs fsc_small"),
+          shiny::plotOutput("vct_plot_pe_fsc_small", height = "40vh")
+        ),
+        bslib::card(
+          bslib::card_header("chl_small vs fsc_small"),
+          shiny::plotOutput("vct_plot_chl_small_fsc_small", height = "40vh")
+        ),
+        bslib::card(
+          bslib::card_header("pe vs chl_small"),
+          shiny::plotOutput("vct_plot_pe_chl_small", height = "40vh")
+        )
       )
     )
   )
