@@ -65,15 +65,8 @@ ui <- bslib::page_sidebar(
         bslib::layout_columns(
           col_widths = c(3, 9),
           shiny::div(
-            shiny::p("Click a point in the Stat plot to load bead events for that hour."),
-            shiny::sliderInput(
-              inputId = "bead_hex_bins",
-              label = "Hex bins",
-              min = 10,
-              max = 200,
-              value = 110,
-              step = 5
-            )
+            shiny::p("Select filters to apply to bead EVT plot."),
+            shiny::checkboxInput("alignment_filter", "EVT Alignment Filter", value = TRUE),
           ),
           shiny::plotOutput("bead_evt_hex_plot", height = paste0(FILTER_PLOT_VH, "vh")),
           shiny::div(),  # placeholder

@@ -53,8 +53,13 @@ server <- function(input, output, session) {
     ))
   })
 
+  # Clear selected Stat point when cruise changes
+  observeEvent(input$cruise, ignoreInit = TRUE, {
+    selected_stat_x(NULL)
+  })
+
   # Keep server-side flag selection state in sync with user interaction.
-  observeEvent(input$exclude_flags, ignoreInit = TRUE, {
+  observeEvent(input$exclude_flags, ignoreInit = TRUE, ignoreNULL = FALSE, {
     exclude_flags_selected(as.character(input$exclude_flags))
   })
 
@@ -195,7 +200,11 @@ server <- function(input, output, session) {
   time_filtered_bead_opp_data <- reactive({
     df <- time_filtered_bead_evt_data()
 
-    fp <- active_bead_filter_params() |>
+    fp <- active_bead_filter_params()
+    validate(need(nrow(fp) > 0, "No active filter parameters found for the selected Stat point."))
+    # filter_evt expects filter params columns to have dot separators instead
+    # of underscores.
+    fp <- fp |>
       dplyr::rename_with(~gsub("_", ".", .x, fixed = TRUE))
 
     # Filter params have been filtered down to one quantile. Add rows for the
@@ -209,7 +218,6 @@ server <- function(input, output, session) {
   })
 
   output$bead_evt_hex_plot <- renderPlot({
-    req(input$bead_hex_bins)
     df <- time_filtered_bead_evt_data()
 
     validate(need(!is.null(selected_stat_x()), "Click a point in the Stat plot to view bead events."))
@@ -230,6 +238,16 @@ server <- function(input, output, session) {
       "D1 vs fsc_small",
       "D2 vs fsc_small"
     )
+
+    # Apply EVT filters
+    if (input$alignment_filter) {
+      width <- active_bead_filter_params()$width[[1]]
+      rows_before <- nrow(df)
+      df <- df |> filter((df$D2 < df$D1 + width) & (df$D1 < df$D2 + width))
+      rows_after <- nrow(df)
+      print(glue::glue("Applied EVT alignment filter: {rows_before} -> {rows_after} rows"))
+    }
+    print(glue::glue("Rendering bead EVT hex plot with {nrow(df)} events"))
 
     plot_df <- df |>
       dplyr::select(fsc_small, chl_small, pe, D1, D2) |>
@@ -348,7 +366,7 @@ server <- function(input, output, session) {
     }
 
     p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = fsc_small, y = y_value)) +
-      ggplot2::geom_hex(bins = input$bead_hex_bins) +
+      ggplot2::geom_hex(bins = BEAD_HEXBIN_BINS) +
       ggplot2::scale_fill_viridis_c(trans = "log10", name = "Count") +
       ggplot2::facet_wrap(~panel, ncol = 2, scales = "free_y") +
       ggplot2::labs(
@@ -399,7 +417,6 @@ server <- function(input, output, session) {
   })
 
   output$bead_opp_hex_plot <- renderPlot({
-    req(input$bead_hex_bins)
     df <- time_filtered_bead_opp_data()
 
     validate(need(!is.null(selected_stat_x()), "Click a point in the Stat plot to view bead events."))
@@ -538,7 +555,7 @@ server <- function(input, output, session) {
     }
 
     p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = fsc_small, y = y_value)) +
-      ggplot2::geom_hex(bins = input$bead_hex_bins) +
+      ggplot2::geom_hex(bins = BEAD_HEXBIN_BINS) +
       ggplot2::scale_fill_viridis_c(trans = "log10", name = "Count") +
       ggplot2::facet_wrap(~panel, ncol = 2, scales = "free_y") +
       ggplot2::labs(
