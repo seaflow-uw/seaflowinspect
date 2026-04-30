@@ -3,7 +3,6 @@ ui <- bslib::page_sidebar(
   sidebar = bslib::sidebar(
     shiny::selectInput("cruise", "Cruise", choices = sort(unique(all_data_source_files$cruise))),
     shiny::selectInput("variation", "Variation", choices = NULL),
-    shiny::checkboxGroupInput("exclude_flags", "Exclude flags", choices = NULL),
     shiny::hr(),
     bslib::card(
       bslib::card_header("Selection State"),
@@ -41,7 +40,8 @@ ui <- bslib::page_sidebar(
               "Abundance" = "abundance",
               "Diameter" = "diameter",
               "OPP/EVT ratio" = "opp_evt_ratio"
-            ))
+            )),
+            shiny::checkboxGroupInput("exclude_flags", "Exclude flags", choices = NULL)
           ),
           plotly::plotlyOutput("stat_plot", height = paste0(STAT_PLOT_VH, "vh"))
         )
