@@ -72,12 +72,11 @@ plot_vct_cytogram <- function(df, x = "fsc_small", y = "chl_small",
     for (i in seq_len(nrow(gating))) {
       gating_id <- gating$id[i]
       pop <- gating$pop[i]
-      gating_x <- gating$channel1[i]
-      gating_y <- gating$channel2[i]
-      if (is.na(gating_x) || is.na(gating_y)) {
+      gating_channels <- c(gating$channel1[i], gating$channel2[i])
+      if (any(is.na(gating_channels))) {
         next
       }
-      if ((gating_x != rlang::as_string(x)) || (gating_y != rlang::as_string(y))) {
+      if (!(setequal(gating_channels, c(rlang::as_string(x), rlang::as_string(y))))) {
         next
       }
 
