@@ -673,24 +673,6 @@ server <- function(input, output, session) {
     }
   })
 
-  output$vct_first_row <- renderText({
-    if (is.null(clicked_stat_x())) {
-      return("Click a Stat point to load VCT hour.")
-    }
-
-    vdir <- selected_files()$vct_dir[[1]]
-    if (is.na(vdir)) {
-      return("No VCT directory for selected variation.")
-    }
-
-    df <- tryCatch(vct_data(), error = function(e) NULL)
-    if (is.null(df) || nrow(df) == 0) {
-      return("No VCT rows for selected hour.")
-    }
-
-    paste(capture.output(print(df[1, , drop = FALSE], width = 120)), collapse = " ")
-  })
-
   output$sfl_plot <- renderPlotly({
     req(input$sfl_metric)
     df <- filtered_sfl_data()

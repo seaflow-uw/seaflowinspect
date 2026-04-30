@@ -9,9 +9,6 @@ ui <- bslib::page_sidebar(
       bslib::card_header("Selection State"),
       shiny::strong("Stat x:"),
       shiny::textOutput("selected_stat_x"),
-      shiny::hr(),
-      shiny::strong("VCT first row:"),
-      shiny::textOutput("vct_first_row")
     )
   ),
   bslib::navset_tab(
