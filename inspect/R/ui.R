@@ -78,7 +78,7 @@ ui <- bslib::page_sidebar(
       "Gating",
       bslib::card(
         bslib::card_header("Gating"),
-        shiny::p("Gating views will appear here.")
+        shiny::plotOutput("vct_plot", height = "40vh")
       )
     )
   )

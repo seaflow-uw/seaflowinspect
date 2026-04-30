@@ -171,5 +171,10 @@ read_vct_parquet <- function(vct_dir, hour) {
     select_cols = cols,
     where_clause = glue::glue("q{QUANTILE} = TRUE")
   ) |>
-    dplyr::rename(time = date)
+    dplyr::rename(
+      time = date,
+      pop = glue::glue("pop_q{QUANTILE}"),
+      diameter = glue::glue("diam_{REFRAC}_q{QUANTILE}"),
+      qc = glue::glue("Qc_{REFRAC}_q{QUANTILE}")
+    )
 }

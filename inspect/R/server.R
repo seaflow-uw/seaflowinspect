@@ -780,4 +780,14 @@ server <- function(input, output, session) {
         xaxis3 = list(range = shared_x_range())
       )
   })
+
+  output$vct_plot <- renderPlot({
+    df <- vct_data()
+    validate(need(nrow(df) > 0, "No VCT data for selected hour."))
+    popcycle::plot_vct_cytogram(
+      df,
+      para.x = "fsc_small",
+      para.y = "pe"
+    )
+  })
 }
