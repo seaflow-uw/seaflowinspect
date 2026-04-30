@@ -275,12 +275,8 @@ server <- function(input, output, session) {
     # Apply EVT filters
     if (input$alignment_filter) {
       width <- active_bead_filter_params()$width[[1]]
-      rows_before <- nrow(df)
       df <- df |> filter((df$D2 < df$D1 + width) & (df$D1 < df$D2 + width))
-      rows_after <- nrow(df)
-      print(glue::glue("Applied EVT alignment filter: {rows_before} -> {rows_after} rows"))
     }
-    print(glue::glue("Rendering bead EVT hex plot with {nrow(df)} events"))
 
     plot_df <- df |>
       dplyr::select(fsc_small, chl_small, pe, D1, D2) |>
