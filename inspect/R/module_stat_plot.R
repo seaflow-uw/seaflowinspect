@@ -1,52 +1,3 @@
-# SFL plot module
-# -----------------------------------------------------------------------------
-sflPlotUI <- function(id) {
-  ns <- NS(id)
-  bslib::card(
-    bslib::card_header("SFL"),
-    bslib::layout_columns(
-      col_widths = c(3, 9),
-      shiny::selectInput(ns("metric"), "Metric", choices = c(
-        "PAR" = "par",
-        "Ocean temperature" = "ocean_tmp",
-        "Salinity" = "salinity",
-        "Conductivity" = "conductivity",
-        "Latitude" = "lat",
-        "Longitude" = "lon",
-        "Stream pressure" = "stream_pressure",
-        "Event rate" = "event_rate"
-      )),
-      plotly::plotlyOutput(ns("plot"), height = paste0(SFL_PLOT_VH, "vh"))
-    )
-  )
-}
-
-sflPlotServer <- function(id, sfl_data, stat_vline, x_range) {
-  moduleServer(
-    id,
-    function(input, output, session) {
-      output$plot <- renderPlotly({
-        req(input$metric)
-
-        validate(need(nrow(sfl_data()) > 0, "No SFL rows to plot for current filters."))
-
-        plot_ly(
-          data = sfl_data(),
-          x = ~time,
-          y = as.formula(paste0("~", input$metric)),
-          type = "scatter",
-          mode = "markers",
-          marker = list(size = 3)
-        ) |>
-          layout(
-            xaxis = list(title = "Time", range = x_range()),
-            yaxis = list(title = input$metric),
-            shapes = stat_vline()
-          )
-      })
-    }
-  )
-}
 
 # Stat plot module
 # -----------------------------------------------------------------------------
@@ -73,9 +24,9 @@ statPlotServer <- function(
   id,
   stat_data,
   filtered_stat_data,
-  stat_vline,
   x_range,
-  clear_time_selection
+  clear_time_selection,
+  selected_x_val
 ) {
   normalize_click_time <- function(x) {
     if (is.null(x)) {
@@ -104,9 +55,6 @@ statPlotServer <- function(
   moduleServer(
     id,
     function(input, output, session) {
-      # Manage the user-selected x value
-      selected_stat_x <- reactiveVal(NULL)
-
       stat_click_event <- reactive({
         plotly::event_data(
           "plotly_click",
@@ -120,7 +68,7 @@ statPlotServer <- function(
         if (!is.null(click) && nrow(click) > 0 && !is.null(click$x)) {
           parsed_click_x <- normalize_click_time(click$x[[1]])
           if (!is.null(parsed_click_x)) {
-            selected_stat_x(parsed_click_x)
+            selected_x_val(parsed_click_x)
           }
         }
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
@@ -128,8 +76,16 @@ statPlotServer <- function(
       # Clear time selection if requested
       observeEvent(clear_time_selection(), ignoreInit = TRUE, {
         req(isTRUE(clear_time_selection()))
-        selected_stat_x(NULL)
+        print("Clearing selected time due to cruise change")
+        selected_x_val(NULL)
+        print("Cleared selected_x_val")
         clear_time_selection(FALSE)
+        print("Reset clear_time_selection flag")
+        print("Done clearing selected time")
+      })
+
+      selected_vline_shapes <- reactive({
+        build_selected_vline_shapes(selected_x_val())
       })
 
       # Update population choices when data changes, preserving selection if possible
@@ -168,7 +124,7 @@ statPlotServer <- function(
           layout(
             xaxis = list(title = "Time", range = x_range()),
             yaxis = list(title = metric_label),
-            shapes = stat_vline()
+            shapes = selected_vline_shapes()
           )
 
         # We intentionally accept an occasional startup warning from
@@ -185,10 +141,6 @@ statPlotServer <- function(
         # non-public internals. For this project, keeping code simple is preferred.
         plotly::event_register(p, "plotly_click")
       })
-
-      list(
-        selected_stat_x = reactive(selected_stat_x())
-      )
     }
   )
 }

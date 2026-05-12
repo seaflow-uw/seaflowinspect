@@ -170,7 +170,10 @@ parse_vct_file_hour <- function(vct_file) {
 resolve_vct_file_for_hour <- function(vct_dir, hour) {
   vct_files <- list.files(vct_dir, pattern = "\\.vct\\.parquet$", full.names = TRUE)
   if (length(vct_files) == 0) {
-    stop(glue::glue("No VCT parquet files found in directory: {vct_dir}"))
+    rlang::abort(
+      glue::glue("No VCT parquet files found in directory: {vct_dir}"),
+      class = "vct_no_files"
+    )
   }
 
   target_hour <- lubridate::floor_date(
@@ -181,11 +184,17 @@ resolve_vct_file_for_hour <- function(vct_dir, hour) {
   matches <- vct_files[!is.na(file_hours) & file_hours == target_hour]
 
   if (length(matches) == 0) {
-    stop(glue::glue("No VCT file matches selected UTC hour {format(target_hour, '%Y-%m-%dT%H:%M:%SZ')} in {vct_dir}"))
+    rlang::abort(
+      glue::glue("No VCT file matches selected UTC hour {format(target_hour, '%Y-%m-%dT%H:%M:%SZ')} in {vct_dir}"),
+      class = "vct_no_match"
+    )
   }
 
   if (length(matches) > 1) {
-    stop(glue::glue("Multiple VCT files match selected UTC hour {format(target_hour, '%Y-%m-%dT%H:%M:%SZ')} in {vct_dir}"))
+    rlang::abort(
+      glue::glue("Multiple VCT files match selected UTC hour {format(target_hour, '%Y-%m-%dT%H:%M:%SZ')} in {vct_dir}"),
+      class = "vct_multiple_matches"
+    )
   }
 
   matches[[1]]
