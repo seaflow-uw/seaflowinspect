@@ -3,6 +3,7 @@ ui <- bslib::page_sidebar(
   sidebar = bslib::sidebar(
     shiny::selectInput("cruise", "Cruise", choices = sort(unique(all_data_source_files$cruise))),
     shiny::selectInput("variation", "Variation", choices = NULL),
+    shiny::checkboxGroupInput("exclude_flags", "Exclude flags", choices = NULL),
     shiny::hr(),
     bslib::card(
       bslib::card_header("Selection State"),
@@ -13,39 +14,8 @@ ui <- bslib::page_sidebar(
   bslib::navset_tab(
     bslib::nav_panel(
       "Summary",
-      bslib::card(
-        bslib::card_header("SFL"),
-        bslib::layout_columns(
-          col_widths = c(3, 9),
-          shiny::selectInput("sfl_metric", "Metric", choices = c(
-            "PAR" = "par",
-            "Ocean temperature" = "ocean_tmp",
-            "Salinity" = "salinity",
-            "Conductivity" = "conductivity",
-            "Latitude" = "lat",
-            "Longitude" = "lon",
-            "Stream pressure" = "stream_pressure",
-            "Event rate" = "event_rate"
-          )),
-          plotly::plotlyOutput("sfl_plot", height = paste0(SFL_PLOT_VH, "vh"))
-        )
-      ),
-      bslib::card(
-        bslib::card_header("Stat"),
-        bslib::layout_columns(
-          col_widths = c(3, 9),
-          shiny::div(
-            shiny::selectInput("stat_pop", "Population", choices = NULL),
-            shiny::selectInput("stat_metric", "Metric", choices = c(
-              "Abundance" = "abundance",
-              "Diameter" = "diameter",
-              "OPP/EVT ratio" = "opp_evt_ratio"
-            )),
-            shiny::checkboxGroupInput("exclude_flags", "Exclude flags", choices = NULL)
-          ),
-          plotly::plotlyOutput("stat_plot", height = paste0(STAT_PLOT_VH, "vh"))
-        )
-      ),
+      sflPlotUI("sfl_plot"),
+      statPlotUI("stat_plot"),
       bslib::card(
         bslib::card_header("Filter Params"),
         bslib::layout_columns(

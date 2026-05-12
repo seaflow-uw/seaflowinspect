@@ -1,61 +1,10 @@
 server <- function(input, output, session) {
   exclude_flags_selected <- reactiveVal(c("1", "2", "3"))
-  selected_stat_x <- reactiveVal(NULL)
-
-  normalize_click_time <- function(x) {
-    if (is.null(x)) {
-      return(NULL)
-    }
-
-    if (inherits(x, "POSIXt")) {
-      return(lubridate::with_tz(as.POSIXct(x), tzone = "UTC"))
-    }
-
-    if (is.numeric(x)) {
-      return(as.POSIXct(x, origin = "1970-01-01", tz = "UTC"))
-    }
-
-    parsed <- suppressWarnings(lubridate::ymd_hms(as.character(x), quiet = TRUE))
-    if (all(is.na(parsed))) {
-      parsed <- suppressWarnings(lubridate::ymd_hm(as.character(x), quiet = TRUE))
-    }
-    if (all(is.na(parsed))) {
-      return(NULL)
-    }
-
-    lubridate::with_tz(parsed[[1]], tzone = "UTC")
-  }
-
-  clicked_stat_x <- reactive({
-    x <- selected_stat_x()
-    if (is.null(x)) {
-      return(NULL)
-    }
-
-    x
-  })
-
-  clicked_stat_vline <- reactive({
-    x <- clicked_stat_x()
-    if (is.null(x)) {
-      return(NULL)
-    }
-
-    list(list(
-      type = "line",
-      x0 = x,
-      x1 = x,
-      y0 = 0,
-      y1 = 1,
-      xref = "x",
-      yref = "paper",
-      line = list(color = "#d62728", width = 1.5, dash = "dot")
-    ))
-  })
+  clear_stat_time_selection <- reactiveVal(FALSE)
 
   # Clear selected Stat point when cruise changes
   observeEvent(input$cruise, ignoreInit = TRUE, {
-    selected_stat_x(NULL)
+    clear_stat_time_selection(TRUE)
   })
 
   # Keep server-side flag selection state in sync with user interaction.
@@ -72,6 +21,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "variation", choices = choices)
   })
 
+  # Reactive expression for the currently selected files based on cruise and variation inputs
   selected_files <- reactive({
     req(input$cruise, input$variation)
     files <- all_data_source_files |>
@@ -87,10 +37,69 @@ server <- function(input, output, session) {
     read_stat_file(selected_files()$stat_file[[1]])
   })
 
+  # Stat data filtered according to user-selected flags to exclude
+  filtered_stat_data <- reactive({
+    df <- stat_data()
+
+    if (!is.null(exclude_flags_selected()) && length(exclude_flags_selected()) > 0) {
+      df <- df |> filter(!(as.character(flag) %in% exclude_flags_selected()))
+    }
+
+    df
+  })
+
+  # Create a reactive expression for the vertical line indicating the selected time point
+  clicked_stat_vline <- reactive({
+    x <- selected_stat_x()
+    if (is.null(x)) {
+      return(NULL)
+    }
+
+    list(list(
+      type = "line",
+      x0 = x,
+      x1 = x,
+      y0 = 0,
+      y1 = 1,
+      xref = "x",
+      yref = "paper",
+      line = list(color = "#d62728", width = 1.5, dash = "dot")
+    ))
+  })
+
   # Read selected outlier database SFL table
   sfl_data <- reactive({
     req(!is.na(selected_files()$outlier_db[[1]]))
     read_sfl_table(selected_files()$outlier_db[[1]])
+  })
+
+  # SFL data filtered according to user-selected flags to exclude
+  filtered_sfl_data <- reactive({
+    df <- sfl_data()
+
+    if (!is.null(exclude_flags_selected()) && length(exclude_flags_selected()) > 0) {
+      df <- df |> filter(!(as.character(flag) %in% exclude_flags_selected()))
+    }
+
+    df
+  })
+
+  # Update available flag values for selected variation
+  observe({
+    flags_stat <- stat_data() |> pull(flag)
+    flags_sfl <- sfl_data() |> pull(flag)
+    flags <- sort(unique(c(flags_stat, flags_sfl))) |> as.character()
+
+    selected <- intersect(exclude_flags_selected(), flags)
+    updateCheckboxGroupInput(session, "exclude_flags", choices = flags, selected = selected)
+  })
+
+  # Calculate the shared x-axis range across all plots based on the filtered
+  # SFL data.
+  shared_x_range <- reactive({
+    df <- filtered_sfl_data()
+    validate(need(nrow(df) > 0, "No SFL rows available for current filters."))
+    c(min(df$time, na.rm = TRUE), max(df$time, na.rm = TRUE))
   })
 
   # Read selected filter parameters and cap final plan end_date at the
@@ -105,76 +114,9 @@ server <- function(input, output, session) {
     )
   })
 
-  # Read selected gating parameters and cap final plan end_date at the
-  # last available SFL timestamp.
-  gating_params_data <- reactive({
-    req(!is.na(selected_files()$outlier_db[[1]]))
-    sfl_df <- sfl_data()
-
-    read_gating_params(
-      selected_files()$outlier_db[[1]],
-      max_date = max(sfl_df$time, na.rm = TRUE)
-    )
-  })
-
-  bead_evt_data <- reactive({
-    req(!is.na(selected_files()$bead_file[[1]]))
-    read_bead_sample(selected_files()$bead_file[[1]])
-  })
-
-  vct_data <- reactive({
-    req(!is.na(selected_files()$vct_dir[[1]]))
-    req(!is.null(clicked_stat_x()))
-    read_vct_parquet(selected_files()$vct_dir[[1]], clicked_stat_x())
-  })
-
-  # Update population choices when data changes, preserving selection if possible
-  observe({
-    pops <- sort(unique(stat_data()$pop))
-    selected <- if (input$stat_pop %in% pops) input$stat_pop else pops[[1]]
-    updateSelectInput(session, "stat_pop", choices = pops, selected = selected)
-  })
-
-  # Update available flag values for selected variation
-  observe({
-    flags_stat <- stat_data() |> pull(flag)
-    flags_sfl <- if (!is.na(selected_files()$outlier_db[[1]])) sfl_data() |> pull(flag) else numeric()
-    flags <- sort(unique(c(flags_stat, flags_sfl))) |> as.character()
-
-    selected <- intersect(exclude_flags_selected(), flags)
-    exclude_flags_selected(selected)
-    updateCheckboxGroupInput(session, "exclude_flags", choices = flags, selected = selected)
-  })
-
-  filtered_stat_data <- reactive({
-    req(input$stat_pop)
-    df <- stat_data() |> filter(pop == input$stat_pop)
-
-    if (!is.null(input$exclude_flags) && length(input$exclude_flags) > 0) {
-      df <- df |> filter(!(as.character(flag) %in% input$exclude_flags))
-    }
-
-    df
-  })
-
-  filtered_sfl_data <- reactive({
-    df <- sfl_data()
-
-    if (!is.null(input$exclude_flags) && length(input$exclude_flags) > 0) {
-      df <- df |> filter(!(as.character(flag) %in% input$exclude_flags))
-    }
-
-    df
-  })
-
-  shared_x_range <- reactive({
-    df <- filtered_sfl_data()
-    validate(need(nrow(df) > 0, "No SFL rows available for current filters."))
-    c(min(df$time, na.rm = TRUE), max(df$time, na.rm = TRUE))
-  })
-
+  # Bead filter params for selected time point.
   active_bead_filter_params <- reactive({
-    ts <- clicked_stat_x()
+    ts <- selected_stat_x()
     req(!is.null(ts))
 
     fp <- filter_params_data()
@@ -193,8 +135,21 @@ server <- function(input, output, session) {
       dplyr::slice_tail(n = 1)
   })
 
+  # Read selected gating parameters and cap final plan end_date at the
+  # last available SFL timestamp.
+  gating_params_data <- reactive({
+    req(!is.na(selected_files()$outlier_db[[1]]))
+    sfl_df <- sfl_data()
+
+    read_gating_params(
+      selected_files()$outlier_db[[1]],
+      max_date = max(sfl_df$time, na.rm = TRUE)
+    )
+  })
+
+  # Gating params for selected time point.
   active_gating_params <- reactive({
-    ts <- clicked_stat_x()
+    ts <- selected_stat_x()
     req(!is.null(ts))
 
     gp <- gating_params_data()
@@ -214,12 +169,18 @@ server <- function(input, output, session) {
     gp
   })
 
+  bead_evt_data <- reactive({
+    req(!is.na(selected_files()$bead_file[[1]]))
+    read_bead_sample(selected_files()$bead_file[[1]])
+  })
+
+  # Filter bead data to selected hour
   time_filtered_bead_evt_data <- reactive({
     df <- bead_evt_data()
     validate(need("time" %in% names(df), "Bead event data is missing 'time' column."))
     validate(need(inherits(df$time, "POSIXt"), "Bead event time must be POSIXt."))
 
-    selected_timestamp <- clicked_stat_x()
+    selected_timestamp <- selected_stat_x()
     selected_timestamp_hour <- if (!is.null(selected_timestamp)) lubridate::floor_date(selected_timestamp, unit = "hour") else NULL
     if (!is.null(selected_timestamp_hour)) {
       df <- df |> filter(lubridate::floor_date(time, unit = "hour") == selected_timestamp_hour)
@@ -230,6 +191,7 @@ server <- function(input, output, session) {
     df
   })
 
+  # OPP data for time filtered bead data
   time_filtered_bead_opp_data <- reactive({
     df <- time_filtered_bead_evt_data()
 
@@ -248,6 +210,12 @@ server <- function(input, output, session) {
 
     df <- popcycle::filter_evt(df, fp) |>
       dplyr::filter(.data[[glue::glue("q{QUANTILE}")]] == TRUE)
+  })
+
+  vct_data <- reactive({
+    req(!is.na(selected_files()$vct_dir[[1]]))
+    req(!is.null(selected_stat_x()))
+    read_vct_parquet(selected_files()$vct_dir[[1]], selected_stat_x())
   })
 
   output$bead_evt_hex_plot <- renderPlot({
@@ -634,64 +602,22 @@ server <- function(input, output, session) {
     p
   })
 
-  output$stat_plot <- renderPlotly({
-    req(input$stat_metric)
-    df <- filtered_stat_data()
-    metric_label <- names(which(c(
-      "OPP/EVT ratio" = "opp_evt_ratio",
-      "Abundance" = "abundance",
-      "Diameter" = "diameter"
-    ) == input$stat_metric))
+  sflPlotServer(
+    "sfl_plot",
+    filtered_sfl_data,
+    clicked_stat_vline,
+    shared_x_range
+  )
 
-    validate(need(nrow(df) > 0, "No rows to plot for current filters."))
-
-    p <- plot_ly(
-      data = df,
-      x = ~time,
-      y = as.formula(paste0("~", input$stat_metric)),
-      type = "scatter",
-      mode = "markers",
-      marker = list(size = 3),
-      source = "stat_plot_click"
-    ) |>
-      layout(
-        xaxis = list(title = "Time", range = shared_x_range()),
-        yaxis = list(title = metric_label),
-        shapes = clicked_stat_vline()
-      )
-
-    # We intentionally accept an occasional startup warning from
-    # plotly::event_data("plotly_click", source = "stat_plot_click"):
-    # "...event tied a source ID ... is not registered".
-    #
-    # During initial reactive churn, event_data() can execute before client-side
-    # event registration has fully settled for this source. This is benign,
-    # click interactivity works after first render, and no incorrect data is
-    # produced. This is a timing warning, not a logic error.
-    #
-    # We will not suppress or fix this warning, as robust suppression or
-    # internal-state workarounds add maintenance complexity and couple us to
-    # non-public internals. For this project, keeping code simple is preferred.
-    plotly::event_register(p, "plotly_click")
-  })
-
-  stat_click_event <- reactive({
-    plotly::event_data(
-      "plotly_click",
-      source = "stat_plot_click",
-      priority = "event"
-    )
-  })
-
-  observeEvent(stat_click_event(), {
-    click <- stat_click_event()
-    if (!is.null(click) && nrow(click) > 0 && !is.null(click$x)) {
-      parsed_click_x <- normalize_click_time(click$x[[1]])
-      if (!is.null(parsed_click_x)) {
-        selected_stat_x(parsed_click_x)
-      }
-    }
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  stat_plot_stat <- statPlotServer(
+    "stat_plot",
+    stat_data,
+    filtered_stat_data,
+    clicked_stat_vline,
+    shared_x_range,
+    clear_time_selection = clear_stat_time_selection
+  )
+  selected_stat_x <- stat_plot_stat$selected_stat_x
 
   output$selected_stat_x <- renderText({
     x <- selected_stat_x()
@@ -700,27 +626,6 @@ server <- function(input, output, session) {
     } else {
       format(x, "%Y-%m-%d %H:%M:%S %Z")
     }
-  })
-
-  output$sfl_plot <- renderPlotly({
-    req(input$sfl_metric)
-    df <- filtered_sfl_data()
-
-    validate(need(nrow(df) > 0, "No SFL rows to plot for current filters."))
-
-    plot_ly(
-      data = df,
-      x = ~time,
-      y = as.formula(paste0("~", input$sfl_metric)),
-      type = "scatter",
-      mode = "markers",
-      marker = list(size = 3)
-    ) |>
-      layout(
-        xaxis = list(title = "Time", range = shared_x_range()),
-        yaxis = list(title = input$sfl_metric),
-        shapes = clicked_stat_vline()
-      )
   })
 
   output$filter_params_plot <- renderPlotly({
@@ -752,7 +657,7 @@ server <- function(input, output, session) {
           line = list(width = 3, color = color)
         )
 
-      vx <- clicked_stat_x()
+      vx <- selected_stat_x()
       if (!is.null(vx) && nrow(plot_df) > 0) {
         y_min <- min(plot_df$y_value, na.rm = TRUE)
         y_max <- max(plot_df$y_value, na.rm = TRUE)
