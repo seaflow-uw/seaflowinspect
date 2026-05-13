@@ -3,6 +3,7 @@ server <- function(input, output, session) {
   clear_stat_time_selection <- reactiveVal(FALSE)
   selected_x_val <- reactiveVal(NULL)
   selected_x <- reactive(selected_x_val())
+  sfl_only_n <- reactiveVal(NULL)  # only in SFl, i.e. dropped from OPP or VCT
 
   # Clear selected Stat point when cruise changes
   observeEvent(input$cruise, ignoreInit = TRUE, {
@@ -72,6 +73,14 @@ server <- function(input, output, session) {
 
     selected <- intersect(exclude_flags_selected(), flags)
     updateCheckboxGroupInput(session, "exclude_flags", choices = flags, selected = selected)
+  })
+
+  # Calculate number of rows in SFL that are not in Stat (i.e. dropped from OPP or VCT)
+  observe({
+    sfl_df <- sfl_data()
+    stat_df <- stat_data()
+    sfl_time <- setdiff(sfl_df$time, stat_df$time)
+    sfl_only_n(length(sfl_time))
   })
 
   # Calculate the shared x-axis range across all plots based on the filtered
@@ -242,6 +251,16 @@ server <- function(input, output, session) {
       "None"
     } else {
       format(x, "%Y-%m-%d %H:%M:%S %Z")
+    }
+  })
+
+  # Show exclusive filtered SFL rows
+  output$sfl_only_n <- renderText({
+    n <- sfl_only_n()
+    if (is.null(n)) {
+      "None"
+    } else {
+      format(n, big.mark = ",")
     }
   })
 

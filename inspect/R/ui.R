@@ -8,7 +8,12 @@ ui <- bslib::page_sidebar(
     bslib::card(
       bslib::card_header("Selection State"),
       shiny::strong("Stat x:"),
-      shiny::textOutput("selected_x"),
+      shiny::textOutput("selected_x")
+    ),
+    shiny::hr(),
+    bslib::card(
+      bslib::card_header("SFL-only rows"),
+      shiny::textOutput("sfl_only_n")
     )
   ),
   bslib::navset_tab(
