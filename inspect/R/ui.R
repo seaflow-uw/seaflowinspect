@@ -29,6 +29,20 @@ ui <- bslib::page_sidebar(
     ),
     bslib::nav_panel(
       "Gating",
+      bslib::card(
+        bslib::card_header("Displayed VCT data"),
+        shiny::radioButtons(
+          "gating_vct_scope",
+          "Display scope",
+          choices = c(
+            "Exact time point" = "point",
+            "Entire hour" = "hour"
+          ),
+          selected = "point",
+          inline = TRUE
+        ),
+        shiny::textOutput("gating_vct_scope_text")
+      ),
       bslib::layout_columns(
         col_widths = c(6, 6),
         vctGatingPlotUI("vct_plot_pe_fsc_small", x = "fsc_small", y = "pe"),

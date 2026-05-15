@@ -200,8 +200,9 @@ resolve_vct_file_for_hour <- function(vct_dir, hour) {
   matches[[1]]
 }
 
-read_vct_parquet <- function(vct_dir, hour) {
-  vct_file <- resolve_vct_file_for_hour(vct_dir, hour)
+read_vct_parquet <- function(vct_dir, dt, scope = c("point", "hour")) {
+  scope <- match.arg(scope)
+  vct_file <- resolve_vct_file_for_hour(vct_dir, dt)
   cols <- c(
     "date",
     glue::glue("pop_q{QUANTILE}"),
@@ -216,7 +217,7 @@ read_vct_parquet <- function(vct_dir, hour) {
     "gating_id"
   )
 
-  read_parquet_duckdb(
+  data <- read_parquet_duckdb(
     vct_file,
     select_cols = cols,
     where_clause = glue::glue("q{QUANTILE} = TRUE")
@@ -227,6 +228,13 @@ read_vct_parquet <- function(vct_dir, hour) {
       diameter = glue::glue("diam_{REFRAC}_q{QUANTILE}"),
       qc = glue::glue("Qc_{REFRAC}_q{QUANTILE}")
     )
+
+  if (scope == "point") {
+    data <- data |>
+      dplyr::filter(time == dt)
+  }
+
+  data
 }
 
 read_grid_parquet <- function(grid_file) {
