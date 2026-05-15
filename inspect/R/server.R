@@ -23,9 +23,25 @@ server <- function(input, output, session) {
   observe({
     files <- all_data_source_files |>
       filter(cruise == input$cruise) |>
-      filter(!is.na(stat_file))
+      filter(!is.na(stat_file)) |>
+      distinct(name, default)
     choices <- setNames(files$name, files$name)
-    updateSelectInput(session, "variation", choices = choices)
+    default_choice <- files |>
+      filter(default) |>
+      slice(1) |>
+      pull(name)
+
+    current_choice <- input$variation
+    selected_choice <- NULL
+    if (length(current_choice) == 1 && current_choice %in% files$name) {
+      selected_choice <- current_choice
+    } else if (length(default_choice) > 0) {
+      selected_choice <- default_choice[[1]]
+    } else if (length(files$name) > 0) {
+      selected_choice <- files$name[[1]]
+    }
+
+    updateSelectInput(session, "variation", choices = choices, selected = selected_choice)
   })
 
   # Reactive expression for the currently selected files based on cruise and variation inputs

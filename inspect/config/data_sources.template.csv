@@ -1,4 +1,4 @@
-name,dirs
-variation1,/mnt/variation1
-variation2,/mnt/variation2
-variation3,/mnt/variation3
+name,dir,default
+variation1,/mnt/variation1,false
+variation2,/mnt/variation2,false
+variation3,/mnt/variation3,true

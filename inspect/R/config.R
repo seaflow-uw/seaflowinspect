@@ -22,10 +22,15 @@ if (!file.exists(DATA_SOURCES_FILE)) {
 
 data_sources_raw <- readr::read_csv(DATA_SOURCES_FILE, show_col_types = FALSE)
 
-required_cols <- c("name", "dirs")
+required_cols <- c("name", "dirs", "default")
 if (!all(required_cols %in% names(data_sources_raw))) {
-  stop("Data sources config must include columns: name, dirs")
+  stop("Data sources config must include columns: name, dirs, default")
 }
 
+data_sources_raw <- data_sources_raw |>
+  dplyr::mutate(
+    default = tolower(as.character(default)) %in% c("true", "t", "1", "yes", "y")
+  )
+
 data_sources <- data_sources_raw |>
-  dplyr::select(name, dirs)
+  dplyr::select(name, dirs, default)
