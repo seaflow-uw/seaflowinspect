@@ -228,3 +228,11 @@ read_vct_parquet <- function(vct_dir, hour) {
       qc = glue::glue("Qc_{REFRAC}_q{QUANTILE}")
     )
 }
+
+read_grid_parquet <- function(grid_file) {
+  read_parquet_duckdb(grid_file)
+}
+
+read_grid_bins_parquet <- function(grid_bins_file) {
+  read_parquet_duckdb(grid_bins_file)
+}

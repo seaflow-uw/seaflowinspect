@@ -13,7 +13,10 @@ server <- function(input, output, session) {
 
   # Keep server-side flag selection state in sync with user interaction.
   observeEvent(input$exclude_flags, ignoreInit = TRUE, ignoreNULL = FALSE, {
-    exclude_flags_selected(as.character(input$exclude_flags))
+    selected <- if (is.null(input$exclude_flags)) character() else as.character(input$exclude_flags)
+    if (!identical(exclude_flags_selected(), selected)) {
+      exclude_flags_selected(selected)
+    }
   })
 
   # Update variation choices whenever cruise changes
@@ -65,13 +68,15 @@ server <- function(input, output, session) {
     df
   })
 
-  # Update available flag values for selected variation
-  observe({
+  # Update available flag values when the underlying data changes. This avoids
+  # writing the checkbox state back to the input on every user toggle.
+  observeEvent(list(stat_data(), sfl_data()), ignoreInit = FALSE, {
     flags_stat <- stat_data() |> pull(flag)
     flags_sfl <- sfl_data() |> pull(flag)
     flags <- sort(unique(c(flags_stat, flags_sfl))) |> as.character()
 
     selected <- intersect(exclude_flags_selected(), flags)
+    exclude_flags_selected(selected)
     updateCheckboxGroupInput(session, "exclude_flags", choices = flags, selected = selected)
   })
 
@@ -228,6 +233,16 @@ server <- function(input, output, session) {
     )
   })
 
+  gridded_data <- reactive({
+    req(!is.na(selected_files()$grid_gridded_file[[1]]))
+    read_grid_parquet(selected_files()$grid_gridded_file[[1]])
+  })
+
+  grid_data <- reactive({
+    req(!is.na(selected_files()$grid_grid_file[[1]]))
+    read_grid_bins_parquet(selected_files()$grid_grid_file[[1]])
+  })
+
   sflPlotServer(
     "sfl_plot",
     filtered_sfl_data,
@@ -298,5 +313,11 @@ server <- function(input, output, session) {
     active_gating_params,
     x = "chl_small",
     y = "pe"
+  )
+
+  ridgelinePlotServer(
+    "ridgeline_plot",
+    gridded_data,
+    grid_data
   )
 }

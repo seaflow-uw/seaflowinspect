@@ -35,6 +35,10 @@ ui <- bslib::page_sidebar(
         vctGatingPlotUI("vct_plot_chl_small_fsc_small", x = "fsc_small", y = "chl_small"),
         vctGatingPlotUI("vct_plot_pe_chl_small", x = "chl_small", y = "pe")
       )
+    ),
+    bslib::nav_panel(
+      "Ridgeline",
+      ridgelinePlotUI("ridgeline_plot")
     )
   )
 )
