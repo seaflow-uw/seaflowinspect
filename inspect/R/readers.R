@@ -238,7 +238,10 @@ read_vct_parquet <- function(vct_dir, dt, scope = c("point", "hour")) {
 }
 
 read_grid_parquet <- function(grid_file) {
-  read_parquet_duckdb(grid_file)
+  message(glue::glue("Reading grid parquet with DuckDB: {grid_file}"))
+  data <- read_parquet_duckdb(grid_file)
+  message(glue::glue("Finished reading grid parquet: {grid_file}"))
+  data
 }
 
 read_grid_bins_parquet <- function(grid_bins_file) {

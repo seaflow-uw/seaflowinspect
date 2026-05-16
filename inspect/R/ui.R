@@ -17,6 +17,7 @@ ui <- bslib::page_sidebar(
     )
   ),
   bslib::navset_tab(
+    id = "main_tab",
     bslib::nav_panel(
       "Summary",
       sflPlotUI("sfl_plot"),
@@ -36,7 +37,7 @@ ui <- bslib::page_sidebar(
           "Display scope",
           choices = c(
             "Exact time point" = "point",
-            "Entire hour" = "hour"
+            "Hour" = "hour"
           ),
           selected = "point",
           inline = TRUE
@@ -52,6 +53,10 @@ ui <- bslib::page_sidebar(
     ),
     bslib::nav_panel(
       "Ridgeline",
+      # Keep this internal value in sync with the active_tab_value passed to
+      # ridgelinePlotServer() so the module can defer gridded-data reads until
+      # the tab is actually active.
+      value = "ridgeline",
       ridgelinePlotUI("ridgeline_plot")
     )
   )

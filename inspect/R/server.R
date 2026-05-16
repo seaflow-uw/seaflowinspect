@@ -239,15 +239,18 @@ server <- function(input, output, session) {
   }
 
   vct_data <- reactive({
+    print("In vct_data reactive")
     req(!is.na(selected_files()$vct_dir[[1]]))
     req(!is.null(selected_x()))
     vct_scope <- if (is.null(input$gating_vct_scope)) "point" else input$gating_vct_scope
 
-    tryCatch(
+    data <- tryCatch(
       read_vct_parquet(selected_files()$vct_dir[[1]], selected_x(), scope = vct_scope),
       vct_no_files = function(e) empty_vct_data(),
       vct_no_match = function(e) empty_vct_data()
     )
+    print("leaving vct_data reactive")
+    data
   })
 
   output$gating_vct_scope_text <- renderText({
@@ -261,12 +264,12 @@ server <- function(input, output, session) {
     if (identical(scope, "hour")) {
       hour_ts <- lubridate::floor_date(ts, unit = "hour")
       return(glue::glue(
-        "Displaying all VCT rows from the hour containing selected_x: {format(hour_ts, '%Y-%m-%d %H:%M:%S %Z')}"
+        "Displaying selected hour: {format(hour_ts, '%Y-%m-%d %H:%M:%S %Z')}"
       ))
     }
 
     glue::glue(
-      "Displaying only VCT rows for the exact selected_x time point: {format(ts, '%Y-%m-%d %H:%M:%S %Z')}"
+      "Displaying selected 3-min time point: {format(ts, '%Y-%m-%d %H:%M:%S %Z')}"
     )
   })
 
@@ -355,6 +358,9 @@ server <- function(input, output, session) {
   ridgelinePlotServer(
     "ridgeline_plot",
     gridded_data,
-    grid_data
+    grid_data,
+    selected_x,
+    active_tab = reactive(input$main_tab),
+    active_tab_value = "ridgeline"
   )
 }
