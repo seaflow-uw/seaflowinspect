@@ -14,6 +14,12 @@ ridgelinePlotUI <- function(id) {
         "Height value",
         choices = c("n", "Qc_sum"),
         selected = "Qc_sum"
+      ),
+      shiny::numericInput(
+        ns("scale"),
+        "Scale",
+        value = 100,
+        min = 1
       )
     ),
     shiny::uiOutput(ns("pop_filter_ui")),
@@ -205,6 +211,7 @@ ridgelinePlotServer <- function(id, gridded_df, grid_bins_df, selected_x, active
         df <- gridded_plot_df()
         x_var <- req(input$x_var)
         height_var <- req(input$height_var)
+        scale <- req(input$scale)
         selected_pops <- input$pop_filter
         time_range <- debounced_effective_time_range()
         x_coord_col <- paste0(x_var, "_coord")
@@ -247,7 +254,7 @@ ridgelinePlotServer <- function(id, gridded_df, grid_bins_df, selected_x, active
             fill = pop
           )
         ) +
-          ggridges::geom_ridgeline(scale = 100, alpha = 0.6) +
+          ggridges::geom_ridgeline(scale = scale, alpha = 0.6) +
           ggplot2::labs(x = x_var, height = height_var)
       })
     }
