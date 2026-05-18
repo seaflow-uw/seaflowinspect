@@ -30,7 +30,7 @@ ridgelinePlotUI <- function(id) {
     ),
     shiny::textOutput(ns("active_time_range_text")),
     shiny::uiOutput(ns("time_range_ui")),
-    shiny::plotOutput(ns("plot"), height = "80vh")
+    shiny::plotOutput(ns("plot"), height = "40vh")
   )
 }
 
