@@ -16,6 +16,7 @@ ridgelinePlotUI <- function(id) {
         selected = "Qc_sum"
       )
     ),
+    shiny::uiOutput(ns("pop_filter_ui")),
     shiny::checkboxInput(
       ns("selected_hour_only"),
       "Limit to selected hour",
@@ -111,6 +112,31 @@ ridgelinePlotServer <- function(id, gridded_df, grid_bins_df, selected_x, active
         )
       })
 
+      available_pops <- reactive({
+        df <- gridded_plot_df()
+        validate(need(nrow(df) > 0, "No gridded data available."))
+        validate(need("pop" %in% names(df), "Gridded data is missing 'pop' column."))
+        sort(unique(df$pop))
+      })
+
+      output$pop_filter_ui <- shiny::renderUI({
+        pops <- available_pops()
+        current <- isolate(input$pop_filter)
+        valid <- intersect(current, pops)
+        default_selected <- setdiff(pops, "unknown")
+        if (length(default_selected) == 0) {
+          default_selected <- pops
+        }
+        selected <- if (!is.null(current)) valid else default_selected
+        shiny::checkboxGroupInput(
+          session$ns("pop_filter"),
+          "Populations",
+          choices = pops,
+          selected = selected,
+          inline = TRUE
+        )
+      })
+
       debounced_effective_time_range <- shiny::debounce(
         reactive({
           req(ridgeline_is_active())
@@ -179,6 +205,7 @@ ridgelinePlotServer <- function(id, gridded_df, grid_bins_df, selected_x, active
         df <- gridded_plot_df()
         x_var <- req(input$x_var)
         height_var <- req(input$height_var)
+        selected_pops <- input$pop_filter
         time_range <- debounced_effective_time_range()
         x_coord_col <- paste0(x_var, "_coord")
 
@@ -190,12 +217,17 @@ ridgelinePlotServer <- function(id, gridded_df, grid_bins_df, selected_x, active
           height_var %in% c("n", "Qc_sum"),
           paste("Unsupported ridgeline height value", height_var)
         ))
+        validate(need(length(selected_pops) > 0, "Select at least one population."))
         validate(need(length(time_range) == 2, "Select a valid ridgeline time range."))
 
         df <- df |>
-          dplyr::filter(date >= time_range[[1]], date < time_range[[2]])
+          dplyr::filter(
+            date >= time_range[[1]],
+            date < time_range[[2]],
+            pop %in% selected_pops
+          )
 
-        validate(need(nrow(df) > 0, "No gridded data available for the selected time range."))
+        validate(need(nrow(df) > 0, "No gridded data available for the selected filters."))
 
         plot_data <- df |>
           # Collapse grid dimensions other than the selected x coordinate.
@@ -204,8 +236,7 @@ ridgelinePlotServer <- function(id, gridded_df, grid_bins_df, selected_x, active
             n = sum(n),
             Qc_sum = sum(Qc_sum),
             .groups = "drop"
-          ) |>
-          dplyr::filter(pop != "unknown")
+          )
         ggplot2::ggplot(
           plot_data,
           ggplot2::aes(
