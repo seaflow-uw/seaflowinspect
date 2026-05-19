@@ -120,6 +120,7 @@ read_gating_params <- function(db_file, max_date = NULL) {
   }
 
   gating_tbl <- popcycle::get_gating_table(db_file) |>
+    dplyr::select(!date) |>
     tibble::as_tibble()
   poly_tbl <- popcycle::get_poly_table(db_file) |>
     tibble::as_tibble()
@@ -135,7 +136,9 @@ read_gating_params <- function(db_file, max_date = NULL) {
     }
   }
 
-  gating_tbl <- dplyr::left_join(gating_tbl, plan_tbl, by = c("id" = "gating_id"))
+  gating_tbl <- plan_tbl |>
+    dplyr::left_join(gating_tbl, by = c("gating_id" = "id")) |>
+    dplyr::rename(id = gating_id)
 
   list(
     gating = gating_tbl,

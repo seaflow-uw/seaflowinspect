@@ -42,6 +42,11 @@ ui <- bslib::page_sidebar(
           selected = "point",
           inline = TRUE
         ),
+        shiny::checkboxInput(
+          "gating_show_gating_order",
+          "Show gating order annotations",
+          value = FALSE
+        ),
         shiny::textOutput("gating_vct_scope_text")
       ),
       bslib::layout_columns(
@@ -49,7 +54,8 @@ ui <- bslib::page_sidebar(
         vctGatingPlotUI("vct_plot_pe_fsc_small", x = "fsc_small", y = "pe"),
         vctGatingPlotUI("vct_plot_chl_small_fsc_small", x = "fsc_small", y = "chl_small"),
         vctGatingPlotUI("vct_plot_pe_chl_small", x = "chl_small", y = "pe")
-      )
+      ),
+      vctGatingTableUI("vct_gating_table")
     ),
     bslib::nav_panel(
       "Ridgeline",

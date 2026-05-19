@@ -9,7 +9,7 @@ vctGatingPlotUI <- function(id, x, y) {
   )
 }
 
-vctGatingPlotServer <- function(id, vct_data, gating_params, x, y) {
+vctGatingPlotServer <- function(id, vct_data, gating_params, show_gating_order, x, y) {
   moduleServer(
     id,
     function(input, output, session) {
@@ -21,7 +21,13 @@ vctGatingPlotServer <- function(id, vct_data, gating_params, x, y) {
         validate(need(nrow(gp$gating) > 0, "No active gating parameters found for selected time."))
         validate(need(nrow(gp$poly) > 0, "No active gating polygon parameters found for selected time."))
 
-        plot_vct_cytogram(df, x = x, y = y, gating_params = gp)
+        plot_vct_cytogram(
+          df,
+          x = x,
+          y = y,
+          gating_params = gp,
+          show_gating_order = isTRUE(show_gating_order())
+        )
       })
     }
   )
@@ -40,7 +46,8 @@ vctGatingPlotServer <- function(id, vct_data, gating_params, x, y) {
 #' @export plot_vct_cytogram
 plot_vct_cytogram <- function(df, x = "fsc_small", y = "chl_small",
                               transform = TRUE, xlim = NULL, ylim = NULL,
-                              gating_params = NULL) {
+                              gating_params = NULL,
+                              show_gating_order = TRUE) {
   pop_colors <- c(
     unknown="grey",
     beads="red3",
@@ -114,6 +121,37 @@ plot_vct_cytogram <- function(df, x = "fsc_small", y = "chl_small",
           color = pop_colors[pop],
           linewidth = 0.5
         )
+
+        if (isTRUE(show_gating_order) && "pop_order" %in% names(gating)) {
+          label_data <- poly_subset |>
+            dplyr::summarise(
+              !!x := mean(.data[[x]], na.rm = TRUE),
+              !!y := mean(.data[[y]], na.rm = TRUE)
+            ) |>
+            dplyr::mutate(pop_order = gating$pop_order[[i]])
+
+          p <- p + ggplot2::geom_text(
+            data = label_data,
+            ggplot2::aes(x = .data[[x]], y = .data[[y]], label = pop_order),
+            color = pop_colors[pop],
+            size = 5,
+            fontface = "bold",
+            show.legend = FALSE,
+            na.rm = TRUE
+          )
+        }
+
+        if (isTRUE(show_gating_order) && "point_order" %in% names(poly_subset)) {
+          p <- p + ggplot2::geom_text(
+            data = poly_subset,
+            ggplot2::aes(x = .data[[x]], y = .data[[y]], label = point_order),
+            color = pop_colors[pop],
+            size = 3,
+            vjust = -0.6,
+            show.legend = FALSE,
+            na.rm = TRUE
+          )
+        }
       }
     }
   }

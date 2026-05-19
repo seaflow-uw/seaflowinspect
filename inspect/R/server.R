@@ -239,7 +239,6 @@ server <- function(input, output, session) {
   }
 
   vct_data <- reactive({
-    print("In vct_data reactive")
     req(!is.na(selected_files()$vct_dir[[1]]))
     req(!is.null(selected_x()))
     vct_scope <- if (is.null(input$gating_vct_scope)) "point" else input$gating_vct_scope
@@ -249,7 +248,6 @@ server <- function(input, output, session) {
       vct_no_files = function(e) empty_vct_data(),
       vct_no_match = function(e) empty_vct_data()
     )
-    print("leaving vct_data reactive")
     data
   })
 
@@ -337,6 +335,7 @@ server <- function(input, output, session) {
     "vct_plot_pe_fsc_small",
     vct_data,
     active_gating_params,
+    show_gating_order = reactive(isTRUE(input$gating_show_gating_order)),
     x = "fsc_small",
     y = "pe"
   )
@@ -344,6 +343,7 @@ server <- function(input, output, session) {
     "vct_plot_chl_small_fsc_small",
     vct_data,
     active_gating_params,
+    show_gating_order = reactive(isTRUE(input$gating_show_gating_order)),
     x = "fsc_small",
     y = "chl_small"
   )
@@ -351,8 +351,13 @@ server <- function(input, output, session) {
     "vct_plot_pe_chl_small",
     vct_data,
     active_gating_params,
+    show_gating_order = reactive(isTRUE(input$gating_show_gating_order)),
     x = "chl_small",
     y = "pe"
+  )
+  vctGatingTableServer(
+    "vct_gating_table",
+    active_gating_params
   )
 
   ridgelinePlotServer(
