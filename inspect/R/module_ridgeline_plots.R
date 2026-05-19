@@ -26,7 +26,7 @@ ridgelinePlotUI <- function(id) {
     shiny::checkboxInput(
       ns("selected_hour_only"),
       "Limit to selected hour",
-      value = FALSE
+      value = TRUE
     ),
     shiny::textOutput(ns("active_time_range_text")),
     shiny::uiOutput(ns("time_range_ui")),
