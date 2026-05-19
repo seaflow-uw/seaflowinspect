@@ -380,6 +380,14 @@ server <- function(input, output, session) {
     active_gating_params
   )
 
+  griddedScatter3dServer(
+    "gridded_scatter3d",
+    gridded_data,
+    selected_x,
+    active_tab = reactive(input$main_tab),
+    active_tab_value = "gridded_3d"
+  )
+
   ridgelinePlotServer(
     "ridgeline_plot",
     gridded_data,

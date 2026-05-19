@@ -58,6 +58,11 @@ ui <- bslib::page_sidebar(
       vctGatingTableUI("vct_gating_table")
     ),
     bslib::nav_panel(
+      "Gridded 3D",
+      value = "gridded_3d",
+      griddedScatter3dUI("gridded_scatter3d")
+    ),
+    bslib::nav_panel(
       "Ridgeline",
       # Keep this internal value in sync with the active_tab_value passed to
       # ridgelinePlotServer() so the module can defer gridded-data reads until
