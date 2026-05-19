@@ -327,6 +327,16 @@ server <- function(input, output, session) {
     }
   })
 
+  # Show selected time point as text timestamp
+  output$selected_hour <- renderText({
+    x <- selected_x() |> lubridate::floor_date(unit = "hour")
+    if (is.null(x)) {
+      "None"
+    } else {
+      format(x, "%Y-%m-%d %H:%M:%S %Z")
+    }
+  })
+
   # Show exclusive filtered SFL rows
   output$sfl_only_n <- renderText({
     n <- sfl_only_n()

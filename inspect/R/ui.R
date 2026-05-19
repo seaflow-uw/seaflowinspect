@@ -6,13 +6,15 @@ ui <- bslib::page_sidebar(
     shiny::checkboxGroupInput("exclude_flags", "Exclude flags", choices = NULL),
     shiny::hr(),
     bslib::card(
-      bslib::card_header("Selection State"),
-      shiny::strong("Stat x:"),
-      shiny::textOutput("selected_x")
+      bslib::card_header("Stat Selection"),
+      shiny::strong("Time:"),
+      shiny::textOutput("selected_x"),
+      shiny::strong("Hour:"),
+      shiny::textOutput("selected_hour")
     ),
     shiny::hr(),
     bslib::card(
-      bslib::card_header("SFL-only rows"),
+      bslib::card_header("SFL-only Rows"),
       shiny::textOutput("sfl_only_n")
     )
   ),
