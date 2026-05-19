@@ -273,7 +273,27 @@ server <- function(input, output, session) {
 
   gridded_data <- reactive({
     req(!is.na(selected_files()$grid_gridded_file[[1]]))
-    read_grid_parquet(selected_files()$grid_gridded_file[[1]])
+    grid <- grid_data()
+    validate(need(nrow(grid) > 0, "Gridded data file contains no rows."))
+    gridded <- read_grid_parquet(selected_files()$grid_gridded_file[[1]])
+    # Replace grid bin numbers with bin starts
+    gridded <- gridded |>
+      dplyr::mutate(
+        fsc_small = grid$fsc_small[gridded$fsc_small_coord],
+        chl_small = grid$chl_small[gridded$chl_small_coord],
+        pe = grid$pe[gridded$pe_coord],
+        Qc = grid$Qc[gridded$Qc_coord]
+      ) |>
+      dplyr::select(-ends_with("_coord"))
+
+    # Note for conversion from carbon per cell Qc to equivalent spherical diameter
+    # Menden-Deuer, S. & Lessard, E. J. Carbon to volume relationships for dinoflagellates, diatoms, and other protist plankton. Limnol. Oceanogr. 45, 569–579 (2000).
+    d <- 0.261
+    e <- 0.860 # < 3000 µm3 
+    gridded <- gridded |>
+      mutate(diam = round(2 * (3 / (4 * base::pi) * (Qc / d)^(1 / e))^(1 / 3), 5))
+
+    gridded
   })
 
   grid_data <- reactive({

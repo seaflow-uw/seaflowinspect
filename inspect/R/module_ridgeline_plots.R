@@ -6,7 +6,7 @@ ridgelinePlotUI <- function(id) {
       shiny::selectInput(
         ns("x_var"),
         "X value",
-        choices = c("fsc_small", "pe", "chl_small", "Qc"),
+        choices = c("fsc_small", "pe", "chl_small", "Qc", "diam"),
         selected = "fsc_small"
       ),
       shiny::selectInput(
@@ -30,7 +30,8 @@ ridgelinePlotUI <- function(id) {
     ),
     shiny::textOutput(ns("active_time_range_text")),
     shiny::uiOutput(ns("time_range_ui")),
-    shiny::plotOutput(ns("plot"), height = "40vh")
+    shiny::plotOutput(ns("plot"), height = "40vh"),
+    plotly::plotlyOutput(ns("plotly_plot"), height = "50vh")
   )
 }
 
@@ -204,21 +205,20 @@ ridgelinePlotServer <- function(id, gridded_df, grid_bins_df, selected_x, active
         )
       })
 
-      output$plot <- shiny::renderPlot({
+      ridgeline_plot_data <- reactive({
         req(ridgeline_is_active())
         req(gridded_df())
         req(grid_bins_df())
+
         df <- gridded_plot_df()
         x_var <- req(input$x_var)
         height_var <- req(input$height_var)
-        scale <- req(input$scale)
         selected_pops <- input$pop_filter
         time_range <- debounced_effective_time_range()
-        x_coord_col <- paste0(x_var, "_coord")
 
         validate(need(
-          x_coord_col %in% names(df),
-          paste("Gridded data is missing expected coordinate column", x_coord_col)
+          x_var %in% names(df),
+          paste("Gridded data is missing expected column", x_var)
         ))
         validate(need(
           height_var %in% c("n", "Qc_sum"),
@@ -236,26 +236,90 @@ ridgelinePlotServer <- function(id, gridded_df, grid_bins_df, selected_x, active
 
         validate(need(nrow(df) > 0, "No gridded data available for the selected filters."))
 
-        plot_data <- df |>
-          # Collapse grid dimensions other than the selected x coordinate.
-          dplyr::group_by(date, pop, .data[[x_coord_col]]) |>
+        df |>
+          dplyr::group_by(date, pop, .data[[x_var]]) |>
           dplyr::summarise(
             n = sum(n),
             Qc_sum = sum(Qc_sum),
             .groups = "drop"
           )
+      })
+
+      output$plot <- shiny::renderPlot({
+        x_var <- req(input$x_var)
+        height_var <- req(input$height_var)
+        scale <- req(input$scale)
+        plot_data <- ridgeline_plot_data()
+
         ggplot2::ggplot(
           plot_data,
           ggplot2::aes(
-            x = .data[[x_coord_col]],
+            x = .data[[x_var]],
             y = date,
             height = .data[[height_var]],
             group = interaction(date, pop),
             fill = pop
           )
         ) +
-          ggridges::geom_ridgeline(scale = scale, alpha = 0.6) +
+          ggridges::geom_ridgeline(scale = scale, alpha = 0.6, color = NA) +
+          ggplot2::scale_x_log10() +
           ggplot2::labs(x = x_var, height = height_var)
+      })
+
+      output$plotly_plot <- plotly::renderPlotly({
+        x_var <- req(input$x_var)
+        height_var <- req(input$height_var)
+        plot_data <- ridgeline_plot_data() |>
+          dplyr::arrange(pop, date, .data[[x_var]])
+
+        validate(need(nrow(plot_data) > 0, "No gridded data available for the selected filters."))
+
+        pops <- sort(unique(plot_data$pop))
+        base_colors <- RColorBrewer::brewer.pal(max(3, min(8, length(pops))), "Set2")
+        pop_colors <- stats::setNames(
+          grDevices::colorRampPalette(base_colors)(length(pops)),
+          pops
+        )
+
+        p <- plotly::plot_ly(type = "scatter3d", mode = "lines")
+
+        for (pop_name in pops) {
+          pop_data <- plot_data |>
+            dplyr::filter(pop == .env[["pop_name"]])
+          pop_dates <- unique(pop_data$date)
+          show_legend <- TRUE
+
+          for (date_value in pop_dates) {
+            trace_data <- pop_data |>
+              dplyr::filter(date == .env[["date_value"]])
+
+            p <- p |>
+              plotly::add_trace(
+                data = trace_data,
+                x = as.formula(paste0("~", x_var)),
+                y = ~date,
+                z = as.formula(paste0("~", height_var)),
+                type = "scatter3d",
+                mode = "lines",
+                name = pop_name,
+                legendgroup = pop_name,
+                showlegend = show_legend,
+                line = list(color = unname(pop_colors[[pop_name]]))
+              )
+
+            show_legend <- FALSE
+          }
+        }
+
+        p |>
+          plotly::layout(
+            scene = list(
+              xaxis = list(title = x_var, type = "log", autorange = "reversed"),
+              yaxis = list(title = "Date", autorange = "reversed"),
+              zaxis = list(title = height_var)
+            ),
+            legend = list(title = list(text = "Population"))
+          )
       })
     }
   )
