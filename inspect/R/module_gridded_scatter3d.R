@@ -26,6 +26,21 @@ griddedScatter3dUI <- function(id) {
         "Marker size",
         choices = c("n", "Qc_sum"),
         selected = "n"
+      ),
+      shiny::checkboxInput(
+        ns("x_log"),
+        "Log X axis",
+        value = TRUE
+      ),
+      shiny::checkboxInput(
+        ns("y_log"),
+        "Log Y axis",
+        value = TRUE
+      ),
+      shiny::checkboxInput(
+        ns("z_log"),
+        "Log Z axis",
+        value = TRUE
       )
     ),
     shiny::uiOutput(ns("pop_filter_ui")),
@@ -38,10 +53,6 @@ griddedScatter3dServer <- function(id, gridded_df, selected_x, active_tab = NULL
   shiny::moduleServer(
     id,
     function(input, output, session) {
-      axis_needs_log <- function(var_name) {
-        !identical(var_name, "Qc")
-      }
-
       scatter_is_active <- shiny::reactive({
         if (is.null(active_tab)) {
           return(TRUE)
@@ -104,6 +115,9 @@ griddedScatter3dServer <- function(id, gridded_df, selected_x, active_tab = NULL
         x_var <- shiny::req(input$x_var)
         y_var <- shiny::req(input$y_var)
         z_var <- shiny::req(input$z_var)
+        x_log <- isTRUE(input$x_log)
+        y_log <- isTRUE(input$y_log)
+        z_log <- isTRUE(input$z_log)
         size_var <- shiny::req(input$size_var)
         selected_pops <- input$pop_filter
         hour_ts <- selected_hour()
@@ -126,17 +140,17 @@ griddedScatter3dServer <- function(id, gridded_df, selected_x, active_tab = NULL
             !is.na(.data[[size_var]])
           )
 
-        if (axis_needs_log(x_var)) {
+        if (x_log) {
           plot_data <- plot_data |>
             dplyr::filter(.data[[x_var]] > 0)
         }
 
-        if (axis_needs_log(y_var)) {
+        if (y_log) {
           plot_data <- plot_data |>
             dplyr::filter(.data[[y_var]] > 0)
         }
 
-        if (axis_needs_log(z_var)) {
+        if (z_log) {
           plot_data <- plot_data |>
             dplyr::filter(.data[[z_var]] > 0)
         }
@@ -149,6 +163,9 @@ griddedScatter3dServer <- function(id, gridded_df, selected_x, active_tab = NULL
         x_var <- shiny::req(input$x_var)
         y_var <- shiny::req(input$y_var)
         z_var <- shiny::req(input$z_var)
+        x_log <- isTRUE(input$x_log)
+        y_log <- isTRUE(input$y_log)
+        z_log <- isTRUE(input$z_log)
         size_var <- shiny::req(input$size_var)
         plot_data <- scatter_plot_data()
 
@@ -189,9 +206,10 @@ griddedScatter3dServer <- function(id, gridded_df, selected_x, active_tab = NULL
         ) |>
           plotly::layout(
             scene = list(
-              xaxis = list(title = x_var, type = if (axis_needs_log(x_var)) "log" else "linear"),
-              yaxis = list(title = y_var, type = if (axis_needs_log(y_var)) "log" else "linear"),
-              zaxis = list(title = z_var, type = if (axis_needs_log(z_var)) "log" else "linear")
+              aspectmode = "cube",
+              xaxis = list(title = x_var, type = if (x_log) "log" else "linear"),
+              yaxis = list(title = y_var, type = if (y_log) "log" else "linear"),
+              zaxis = list(title = z_var, type = if (z_log) "log" else "linear")
             ),
             legend = list(title = list(text = "Population"))
           )

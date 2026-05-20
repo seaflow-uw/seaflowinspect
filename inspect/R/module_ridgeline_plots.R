@@ -20,6 +20,11 @@ ridgelinePlotUI <- function(id) {
         "Scale",
         value = 100,
         min = 1
+      ),
+      shiny::checkboxInput(
+        ns("show_ridgeline_lines"),
+        "Show ridgeline outlines",
+        value = FALSE
       )
     ),
     shiny::uiOutput(ns("pop_filter_ui")),
@@ -249,7 +254,13 @@ ridgelinePlotServer <- function(id, gridded_df, grid_bins_df, selected_x, active
         x_var <- req(input$x_var)
         height_var <- req(input$height_var)
         scale <- req(input$scale)
+        show_ridgeline_lines <- isTRUE(input$show_ridgeline_lines)
         plot_data <- ridgeline_plot_data()
+
+        ridgeline_geom_args <- list(scale = scale, alpha = 0.6)
+        if (!show_ridgeline_lines) {
+          ridgeline_geom_args$color <- NA
+        }
 
         ggplot2::ggplot(
           plot_data,
@@ -261,7 +272,7 @@ ridgelinePlotServer <- function(id, gridded_df, grid_bins_df, selected_x, active
             fill = pop
           )
         ) +
-          ggridges::geom_ridgeline(scale = scale, alpha = 0.6, color = NA) +
+          do.call(ggridges::geom_ridgeline, ridgeline_geom_args) +
           ggplot2::scale_x_log10() +
           ggplot2::labs(x = x_var, height = height_var)
       })
