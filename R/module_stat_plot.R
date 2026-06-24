@@ -12,6 +12,7 @@ statPlotUI <- function(id) {
         shiny::selectInput(ns("metric"), "Metric", choices = c(
           "Abundance" = "abundance",
           "Diameter" = "diameter",
+          "Count" = "n_count",
           "OPP/EVT ratio" = "opp_evt_ratio"
         ))
       ),
@@ -107,7 +108,8 @@ statPlotServer <- function(
         metric_label <- names(which(c(
           "OPP/EVT ratio" = "opp_evt_ratio",
           "Abundance" = "abundance",
-          "Diameter" = "diameter"
+          "Diameter" = "diameter",
+          "Count" = "n_count"
         ) == input$metric))
 
         validate(need(nrow(df) > 0, "No rows to plot for current filters."))

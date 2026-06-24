@@ -52,6 +52,7 @@ read_stat_file <- function(stat_file) {
       time,
       pop,
       opp_evt_ratio,
+      n_count,
       abundance,
       glue("diam_{REFRAC}_med"),
       flag
