@@ -8,6 +8,7 @@ BEAD_FILTER_PANEL_LABELS <- c(
   "D1 vs fsc_small",
   "D2 vs fsc_small"
 )
+BEAD_FILTER_FIXED_AXIS_LIMITS <- c(0, 2^16)
 
 prepare_bead_plot_df <- function(data, filter_params, apply_alignment_filter = FALSE) {
   if (apply_alignment_filter) {
@@ -32,7 +33,7 @@ prepare_bead_plot_df <- function(data, filter_params, apply_alignment_filter = F
     dplyr::filter(!is.na(fsc_small), !is.na(y_value))
 }
 
-build_bead_guide_data <- function(plot_df, filter_params) {
+build_bead_guide_data <- function(plot_df, filter_params, x_limits = NULL) {
   vline_df <- tibble::tibble()
   hline_df <- tibble::tibble()
   abline_segment_df <- tibble::tibble()
@@ -82,14 +83,19 @@ build_bead_guide_data <- function(plot_df, filter_params) {
   ) |>
     dplyr::filter(!is.na(slope), is.finite(slope), !is.na(intercept), is.finite(intercept))
 
-  panel_ranges <- plot_df |>
-    dplyr::filter(panel %in% c("D1 vs fsc_small", "D2 vs fsc_small")) |>
-    dplyr::group_by(panel) |>
-    dplyr::summarise(
-      x_min = min(fsc_small, na.rm = TRUE),
-      x_max = max(fsc_small, na.rm = TRUE),
-      .groups = "drop"
-    )
+  if (is.null(x_limits)) {
+    plot_x_min <- min(plot_df$fsc_small, na.rm = TRUE)
+    plot_x_max <- max(plot_df$fsc_small, na.rm = TRUE)
+  } else {
+    plot_x_min <- x_limits[[1]]
+    plot_x_max <- x_limits[[2]]
+  }
+
+  panel_ranges <- tibble::tibble(
+    panel = factor(c("D1 vs fsc_small", "D2 vs fsc_small"), levels = BEAD_FILTER_PANEL_LABELS),
+    x_min = plot_x_min,
+    x_max = plot_x_max
+  )
 
   abline_segment_df <- abline_df |>
     dplyr::inner_join(panel_ranges, by = "panel") |>
@@ -143,7 +149,14 @@ build_bead_guide_data <- function(plot_df, filter_params) {
   )
 }
 
-build_bead_filter_plot <- function(data, filter_params, title, empty_message, apply_alignment_filter = FALSE) {
+build_bead_filter_plot <- function(
+  data,
+  filter_params,
+  title,
+  empty_message,
+  apply_alignment_filter = FALSE,
+  use_fixed_axis_limits = FALSE
+) {
   validate(need(nrow(data) > 0, empty_message))
   validate(need(
     all(c("fsc_small", "chl_small", "pe", "D1", "D2") %in% names(data)),
@@ -162,19 +175,36 @@ build_bead_filter_plot <- function(data, filter_params, title, empty_message, ap
 
   validate(need(nrow(plot_df) > 0, "No bead rows available to plot after filtering missing values."))
 
-  guide_data <- build_bead_guide_data(plot_df, filter_params)
+  x_limits <- if (isTRUE(use_fixed_axis_limits)) {
+    BEAD_FILTER_FIXED_AXIS_LIMITS
+  } else {
+    NULL
+  }
+
+  guide_data <- build_bead_guide_data(plot_df, filter_params, x_limits = x_limits)
+
+  facet_scales <- if (isTRUE(use_fixed_axis_limits)) "fixed" else "free_y"
 
   p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = fsc_small, y = y_value)) +
     ggplot2::geom_hex(bins = BEAD_HEXBIN_BINS) +
     ggplot2::scale_fill_viridis_c(trans = "log10", name = "Count") +
-    ggplot2::facet_wrap(~panel, ncol = 2, scales = "free_y") +
+    ggplot2::facet_wrap(~panel, ncol = 2, scales = facet_scales) +
     ggplot2::labs(
       x = "FSC",
       y = NULL,
       title = title,
       subtitle = "Filtered to selected hour"
     ) +
-    ggplot2::theme_minimal(base_size = 12)
+    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme(aspect.ratio = 1)
+
+  if (isTRUE(use_fixed_axis_limits)) {
+    p <- p +
+      ggplot2::coord_cartesian(
+        xlim = BEAD_FILTER_FIXED_AXIS_LIMITS,
+        ylim = BEAD_FILTER_FIXED_AXIS_LIMITS
+      )
+  }
 
   if (nrow(guide_data$vline_df) > 0) {
     p <- p +
@@ -224,6 +254,7 @@ beadFilterPlotUI <- function(id) {
       shiny::div(
         shiny::p("Select filters to apply to bead EVT plot."),
         shiny::checkboxInput(ns("alignment_filter"), "EVT Alignment Filter", value = TRUE),
+        shiny::checkboxInput(ns("fixed_axis_limits"), "Use 0 to 2^16 axes", value = FALSE)
       ),
       shiny::plotOutput(ns("evt_plot"), height = paste0(FILTER_PLOT_VH, "vh")),
       shiny::div(),  # placeholder
@@ -242,7 +273,8 @@ beadFilterPlotServer <- function(id, evt_df, opp_df, filter_params) {
           filter_params = filter_params(),
           title = "Bead Subsample EVT",
           empty_message = "No bead EVT data for selected time.",
-          apply_alignment_filter = isTRUE(input$alignment_filter)
+          apply_alignment_filter = isTRUE(input$alignment_filter),
+          use_fixed_axis_limits = isTRUE(input$fixed_axis_limits)
         )
       })
 
@@ -251,7 +283,8 @@ beadFilterPlotServer <- function(id, evt_df, opp_df, filter_params) {
           data = opp_df(),
           filter_params = filter_params(),
           title = "Bead Subsample OPP",
-          empty_message = "No bead OPP data for selected time."
+          empty_message = "No bead OPP data for selected time.",
+          use_fixed_axis_limits = isTRUE(input$fixed_axis_limits)
         )
 
       })
