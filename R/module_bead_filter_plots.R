@@ -254,7 +254,16 @@ beadFilterPlotUI <- function(id) {
       shiny::div(
         shiny::p("Select filters to apply to bead EVT plot."),
         shiny::checkboxInput(ns("alignment_filter"), "EVT Alignment Filter", value = TRUE),
-        shiny::checkboxInput(ns("fixed_axis_limits"), "Use 0 to 2^16 axes", value = FALSE)
+        shiny::checkboxInput(ns("fixed_axis_limits"), "Use 0 to 2^16 axes", value = FALSE),
+        shiny::radioButtons(
+          ns("opp_source"),
+          "OPP source",
+          choices = c(
+            "Filtered EVT-derived OPP" = "filtered_evt",
+            "True OPP" = "vct"
+          ),
+          selected = "filtered_evt"
+        )
       ),
       shiny::plotOutput(ns("evt_plot"), height = paste0(FILTER_PLOT_VH, "vh")),
       shiny::div(),  # placeholder
@@ -263,7 +272,7 @@ beadFilterPlotUI <- function(id) {
   )
 }
 
-beadFilterPlotServer <- function(id, evt_df, opp_df, filter_params) {
+beadFilterPlotServer <- function(id, evt_df, opp_df, vct_opp_df, filter_params) {
   moduleServer(
     id,
     function(input, output, session) {
@@ -279,11 +288,29 @@ beadFilterPlotServer <- function(id, evt_df, opp_df, filter_params) {
       })
 
       output$opp_plot <- renderPlot({
+        opp_plot_df <- if (identical(input$opp_source, "vct")) {
+          vct_opp_df()
+        } else {
+          opp_df()
+        }
+
+        opp_title <- if (identical(input$opp_source, "vct")) {
+          "Bead Subsample OPP (VCT)"
+        } else {
+          "Bead Subsample OPP"
+        }
+
+        opp_empty_message <- if (identical(input$opp_source, "vct")) {
+          "No VCT OPP data for selected hour and active filter."
+        } else {
+          "No bead OPP data for selected time."
+        }
+
         build_bead_filter_plot(
-          data = opp_df(),
+          data = opp_plot_df,
           filter_params = filter_params(),
-          title = "Bead Subsample OPP",
-          empty_message = "No bead OPP data for selected time.",
+          title = opp_title,
+          empty_message = opp_empty_message,
           use_fixed_axis_limits = isTRUE(input$fixed_axis_limits)
         )
 

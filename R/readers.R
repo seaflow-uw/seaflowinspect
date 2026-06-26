@@ -137,11 +137,8 @@ read_gating_params <- function(db_file, max_date = NULL) {
     }
   }
 
-  gating_tbl <- plan_tbl |>
-    dplyr::left_join(gating_tbl, by = c("gating_id" = "id")) |>
-    dplyr::rename(id = gating_id)
-
   list(
+    plan = plan_tbl,
     gating = gating_tbl,
     poly = poly_tbl
   )
@@ -204,8 +201,7 @@ resolve_vct_file_for_hour <- function(vct_dir, hour) {
   matches[[1]]
 }
 
-read_vct_parquet <- function(vct_dir, dt, scope = c("point", "hour")) {
-  scope <- match.arg(scope)
+read_vct_parquet <- function(vct_dir, dt) {
   vct_file <- resolve_vct_file_for_hour(vct_dir, dt)
   cols <- c(
     "date",
@@ -232,11 +228,6 @@ read_vct_parquet <- function(vct_dir, dt, scope = c("point", "hour")) {
       diameter = glue::glue("diam_{REFRAC}_q{QUANTILE}"),
       qc = glue::glue("Qc_{REFRAC}_q{QUANTILE}")
     )
-
-  if (scope == "point") {
-    data <- data |>
-      dplyr::filter(time == dt)
-  }
 
   data
 }

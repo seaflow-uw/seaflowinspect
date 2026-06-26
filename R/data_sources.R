@@ -58,13 +58,6 @@ list_data_source_files <- function(data_sources) {
       full.names = TRUE
     )
 
-    opp_files <- list.files(
-      file.path(dir, "results"),
-      pattern = "\\.opp\\.parquet$",
-      recursive = TRUE,
-      full.names = TRUE
-    )
-
     vct_dirs <- list.files(
       file.path(dir, "results"),
       pattern = "_vct$",

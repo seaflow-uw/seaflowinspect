@@ -157,26 +157,42 @@ server <- function(input, output, session) {
     )
   })
 
-  # Gating params for selected time point.
-  active_gating_params <- reactive({
+  active_gating_params_for_scope <- reactive({
     ts <- selected_x()
     req(!is.null(ts))
 
     gp <- gating_params_data()
+    validate(need("plan" %in% names(gp), "Gating params are missing plan table."))
 
-    # Get gating params for selected stat point
-    gp$gating <- gp$gating |>
-      dplyr::filter(start_date <= ts, is.na(end_date) | ts < end_date)
-    if (length(unique(gp$gating$id)) > 1) {
+    scope <- if (is.null(input$gating_vct_scope)) "point" else input$gating_vct_scope
+    hour_start <- lubridate::floor_date(ts, unit = "hour")
+    hour_end <- hour_start + lubridate::hours(1)
+
+    active_plan <- if (identical(scope, "hour")) {
+      gp$plan |>
+        dplyr::filter(start_date < hour_end, is.na(end_date) | end_date > hour_start)
+    } else {
+      gp$plan |>
+        dplyr::filter(start_date <= ts, is.na(end_date) | ts < end_date)
+    }
+
+    active_ids <- active_plan |>
+      dplyr::pull(gating_id) |>
+      unique()
+
+    if (!identical(scope, "hour") && length(active_ids) > 1) {
       stop(glue::glue("Multiple active gating parameter sets found for selected Stat point (timestamp {ts})."))
     }
-    gp$gating <- gp$gating
 
-    # Filter poly down to those matching id
-    gp$poly <- gp$poly |>
-      dplyr::filter(gating_id %in% gp$gating$id)
+    active_ids <- active_ids[!is.na(active_ids)]
 
-    gp
+    list(
+      plan = active_plan,
+      gating = gp$gating |>
+        dplyr::filter(id %in% active_ids),
+      poly = gp$poly |>
+        dplyr::filter(gating_id %in% active_ids)
+    )
   })
 
   bead_evt_data <- reactive({
@@ -238,17 +254,46 @@ server <- function(input, output, session) {
     )
   }
 
-  vct_data <- reactive({
+  vct_hour_data <- reactive({
     req(!is.na(selected_files()$vct_dir[[1]]))
     req(!is.null(selected_x()))
-    vct_scope <- if (is.null(input$gating_vct_scope)) "point" else input$gating_vct_scope
 
     data <- tryCatch(
-      read_vct_parquet(selected_files()$vct_dir[[1]], selected_x(), scope = vct_scope),
+      read_vct_parquet(selected_files()$vct_dir[[1]], selected_x()),
       vct_no_files = function(e) empty_vct_data(),
       vct_no_match = function(e) empty_vct_data()
     )
     data
+  })
+
+  vct_gating_data <- reactive({
+    df <- vct_hour_data()
+    vct_scope <- if (is.null(input$gating_vct_scope)) "point" else input$gating_vct_scope
+
+    if (identical(vct_scope, "hour")) {
+      return(df)
+    }
+
+    ts <- selected_x()
+    req(!is.null(ts))
+    df |>
+      dplyr::filter(time == ts)
+  })
+
+  time_filtered_bead_vct_opp_data <- reactive({
+    df <- vct_hour_data()
+    fp <- active_bead_filter_params()
+
+    validate(need(nrow(fp) > 0, "No active filter parameters found for selected Stat point."))
+    validate(need("filter_id" %in% names(fp), "Filter params are missing filter_id."))
+    validate(need("filter_id" %in% names(df), "VCT data is missing filter_id column."))
+
+    active_filter_id <- fp$filter_id[[1]]
+    validate(need(!is.na(active_filter_id), "Active filter parameters are missing filter_id."))
+
+    df |>
+      dplyr::filter(filter_id == active_filter_id) |>
+      popcycle::untransformData(columns = c("D1", "D2", "fsc_small", "chl_small", "pe"))
   })
 
   output$gating_vct_scope_text <- renderText({
@@ -358,36 +403,37 @@ server <- function(input, output, session) {
     "bead_filter_plot",
     time_filtered_bead_evt_data,
     time_filtered_bead_opp_data,
+    time_filtered_bead_vct_opp_data,
     active_bead_filter_params
   )
 
   vctGatingPlotServer(
     "vct_plot_pe_fsc_small",
-    vct_data,
-    active_gating_params,
+    vct_gating_data,
+    active_gating_params_for_scope,
     show_gating_order = reactive(isTRUE(input$gating_show_gating_order)),
     x = "fsc_small",
     y = "pe"
   )
   vctGatingPlotServer(
     "vct_plot_chl_small_fsc_small",
-    vct_data,
-    active_gating_params,
+    vct_gating_data,
+    active_gating_params_for_scope,
     show_gating_order = reactive(isTRUE(input$gating_show_gating_order)),
     x = "fsc_small",
     y = "chl_small"
   )
   vctGatingPlotServer(
     "vct_plot_pe_chl_small",
-    vct_data,
-    active_gating_params,
+    vct_gating_data,
+    active_gating_params_for_scope,
     show_gating_order = reactive(isTRUE(input$gating_show_gating_order)),
     x = "chl_small",
     y = "pe"
   )
   vctGatingTableServer(
     "vct_gating_table",
-    active_gating_params
+    active_gating_params_for_scope
   )
 
   griddedScatter3dServer(
