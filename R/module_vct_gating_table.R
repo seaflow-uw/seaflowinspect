@@ -1,3 +1,9 @@
+#' Combine the gating and gating_plan tables into one table of active gating
+#' parameters, joining on gating.id == gating_plan.gating_id.
+combine_gating_and_plan <- function(gating, plan) {
+  dplyr::left_join(plan, gating, by = c("gating_id" = "id"))
+}
+
 vctGatingTableUI <- function(id) {
   ns <- NS(id)
   bslib::card(
@@ -12,11 +18,16 @@ vctGatingTableServer <- function(id, gating_params) {
   moduleServer(
     id,
     function(input, output, session) {
-      gating_table_data <- reactive({
+      combined_gating <- reactive({
         gp <- gating_params()
-        validate(need(nrow(gp$gating) > 0, "No active gating parameters found for selected time."))
+        combine_gating_and_plan(gp$gating, gp$plan)
+      })
 
-        gp$gating |>
+      gating_table_data <- reactive({
+        cg <- combined_gating()
+        validate(need(nrow(cg) > 0, "No active gating parameters found for selected time."))
+
+        cg |>
           dplyr::mutate(
             dplyr::across(
               c(start_date, end_date),
@@ -44,12 +55,12 @@ vctGatingTableServer <- function(id, gating_params) {
           return(NULL)
         }
 
-        gp <- gating_params()
-        validate(need(nrow(gp$gating) > 0, "No active gating parameters found for selected time."))
+        cg <- combined_gating()
+        validate(need(nrow(cg) > 0, "No active gating parameters found for selected time."))
 
         selected_idx <- selected_row[[1]]
-        validate(need(nrow(gp$gating) >= selected_idx, "Selected gating row is no longer available."))
-        gp$gating[selected_idx, , drop = FALSE]
+        validate(need(nrow(cg) >= selected_idx, "Selected gating row is no longer available."))
+        cg[selected_idx, , drop = FALSE]
       })
 
       output$poly_table <- DT::renderDT({
