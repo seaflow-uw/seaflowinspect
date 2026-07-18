@@ -24,8 +24,20 @@ filterParamsServer <- function(id, filter_params_data, x_range, selected_x) {
         make_segment_plot <- function(col_name, y_title, color) {
           plot_df <- df |>
             mutate(y_value = .data[[col_name]]) |>
-            filter(!is.na(start_date), !is.na(end_date), !is.na(y_value))
+            filter(!is.na(start_date), !is.na(end_date), !is.na(y_value)) |>
+            mutate(hover_label = paste0(
+              "Start: ", format(start_date, "%Y-%m-%d %H:%M:%S"), "<br>",
+              "End: ", format(end_date, "%Y-%m-%d %H:%M:%S"), "<br>",
+              y_title, ": ", y_value
+            ))
 
+          # add_segments duplicates each row into a start vertex and an end
+          # vertex (see plotly:::train_data), so a hovertemplate referencing
+          # %{x}/%{xend} shows the wrong value depending on which vertex is
+          # nearest the cursor, and %{xend} isn't a valid token at all (it's
+          # stripped before the trace is sent to plotly.js). Precomputing the
+          # full label as customdata sidesteps both problems since it's the
+          # same value on both vertices.
           p <- plot_ly(plot_df) |>
             add_segments(
               x = ~start_date,
@@ -35,12 +47,8 @@ filterParamsServer <- function(id, filter_params_data, x_range, selected_x) {
               name = y_title,
               legendgroup = y_title,
               showlegend = FALSE,
-              hovertemplate = paste0(
-                "Start: %{x}<br>",
-                "End: %{xend}<br>",
-                y_title,
-                ": %{y}<extra></extra>"
-              ),
+              customdata = ~hover_label,
+              hovertemplate = "%{customdata}<extra></extra>",
               line = list(width = 3, color = color)
             )
 
