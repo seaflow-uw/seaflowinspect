@@ -1,14 +1,12 @@
 server <- function(input, output, session) {
   exclude_flags_selected <- reactiveVal(c("1", "2", "3"))
-  clear_stat_time_selection <- reactiveVal(FALSE)
   selected_x_val <- reactiveVal(NULL)
   selected_x <- reactive(selected_x_val())
   sfl_only_n <- reactiveVal(NULL)  # only in SFl, i.e. dropped from OPP or VCT
 
-  # Clear selected Stat point when cruise changes
+  # Clear selected time point when cruise changes
   observeEvent(input$cruise, ignoreInit = TRUE, {
-    print("Cruise changed, clearing selected time")
-    clear_stat_time_selection(TRUE)
+    selected_x_val(NULL)
   })
 
   # Keep server-side flag selection state in sync with user interaction.
@@ -358,8 +356,14 @@ server <- function(input, output, session) {
     stat_data,
     filtered_stat_data,
     shared_x_range,
-    clear_time_selection = clear_stat_time_selection,
-    selected_x_val = selected_x_val
+    selected_x
+  )
+
+  timeNavPlotServer(
+    "time_nav_plot",
+    filtered_stat_data,
+    shared_x_range,
+    selected_x_val
   )
 
   # Show selected time point as text timestamp

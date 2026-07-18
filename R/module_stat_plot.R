@@ -26,67 +26,13 @@ statPlotServer <- function(
   stat_data,
   filtered_stat_data,
   x_range,
-  clear_time_selection,
-  selected_x_val
+  selected_x
 ) {
-  normalize_click_time <- function(x) {
-    if (is.null(x)) {
-      return(NULL)
-    }
-
-    if (inherits(x, "POSIXt")) {
-      return(lubridate::with_tz(as.POSIXct(x), tzone = "UTC"))
-    }
-
-    if (is.numeric(x)) {
-      return(as.POSIXct(x, origin = "1970-01-01", tz = "UTC"))
-    }
-
-    parsed <- suppressWarnings(lubridate::ymd_hms(as.character(x), quiet = TRUE))
-    if (all(is.na(parsed))) {
-      parsed <- suppressWarnings(lubridate::ymd_hm(as.character(x), quiet = TRUE))
-    }
-    if (all(is.na(parsed))) {
-      return(NULL)
-    }
-
-    lubridate::with_tz(parsed[[1]], tzone = "UTC")
-  }
-
   moduleServer(
     id,
     function(input, output, session) {
-      stat_click_event <- reactive({
-        plotly::event_data(
-          "plotly_click",
-          source = session$ns("plot_click"),
-          priority = "event"
-        )
-      })
-
-      observeEvent(stat_click_event(), {
-        click <- stat_click_event()
-        if (!is.null(click) && nrow(click) > 0 && !is.null(click$x)) {
-          parsed_click_x <- normalize_click_time(click$x[[1]])
-          if (!is.null(parsed_click_x)) {
-            selected_x_val(parsed_click_x)
-          }
-        }
-      }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-      # Clear time selection if requested
-      observeEvent(clear_time_selection(), ignoreInit = TRUE, {
-        req(isTRUE(clear_time_selection()))
-        print("Clearing selected time due to cruise change")
-        selected_x_val(NULL)
-        print("Cleared selected_x_val")
-        clear_time_selection(FALSE)
-        print("Reset clear_time_selection flag")
-        print("Done clearing selected time")
-      })
-
       selected_vline_shapes <- reactive({
-        build_selected_vline_shapes(selected_x_val())
+        build_selected_vline_shapes(selected_x())
       })
 
       # Update population choices when data changes, preserving selection if possible
@@ -114,34 +60,19 @@ statPlotServer <- function(
 
         validate(need(nrow(df) > 0, "No rows to plot for current filters."))
 
-        p <- plot_ly(
+        plot_ly(
           data = df,
           x = ~time,
           y = as.formula(paste0("~", input$metric)),
           type = "scatter",
           mode = "markers",
-          marker = list(size = 3),
-          source = session$ns("plot_click")
+          marker = list(size = 3)
         ) |>
           layout(
             xaxis = list(title = "Time", range = x_range()),
             yaxis = list(title = metric_label),
             shapes = selected_vline_shapes()
           )
-
-        # We intentionally accept an occasional startup warning from
-        # plotly::event_data("plotly_click", source = session$ns("plot_click")):
-        # "...event tied a source ID ... is not registered".
-        #
-        # During initial reactive churn, event_data() can execute before client-side
-        # event registration has fully settled for this source. This is benign,
-        # click interactivity works after first render, and no incorrect data is
-        # produced. This is a timing warning, not a logic error.
-        #
-        # We will not suppress or fix this warning, as robust suppression or
-        # internal-state workarounds add maintenance complexity and couple us to
-        # non-public internals. For this project, keeping code simple is preferred.
-        plotly::event_register(p, "plotly_click")
       })
     }
   )

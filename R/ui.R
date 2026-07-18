@@ -18,6 +18,7 @@ ui <- bslib::page_sidebar(
       shiny::textOutput("sfl_only_n")
     )
   ),
+  timeNavPlotUI("time_nav_plot"),
   bslib::navset_tab(
     id = "main_tab",
     bslib::nav_panel(
