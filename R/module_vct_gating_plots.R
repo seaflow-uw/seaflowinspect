@@ -25,6 +25,8 @@ vctGatingPlotServer <- function(id, vct_data, gating_params, show_gating_order, 
           df,
           x = x,
           y = y,
+          xlim = c(1, 10^3.5),
+          ylim = c(1, 10^3.5),
           gating_params = gp,
           show_gating_order = isTRUE(show_gating_order())
         )
