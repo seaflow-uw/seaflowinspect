@@ -12,6 +12,9 @@ statPlotUI <- function(id) {
         shiny::selectInput(ns("metric"), "Metric", choices = c(
           "Abundance" = "abundance",
           "Diameter" = "diameter",
+          "forward-scatter" = "fsc_med",
+          "chlorophyll" = "chl_med",
+          "phycoerythrin" = "pe_med",
           "Count" = "n_count",
           "OPP/EVT ratio" = "opp_evt_ratio"
         ))

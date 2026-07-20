@@ -54,6 +54,9 @@ read_stat_file <- function(stat_file) {
       opp_evt_ratio,
       n_count,
       abundance,
+      fsc_med,
+      chl_med,
+      pe_med,
       glue("diam_{REFRAC}_med"),
       flag
     ) |>
@@ -233,10 +236,7 @@ read_vct_parquet <- function(vct_dir, dt) {
 }
 
 read_grid_parquet <- function(grid_file) {
-  message(glue::glue("Reading grid parquet with DuckDB: {grid_file}"))
-  data <- read_parquet_duckdb(grid_file)
-  message(glue::glue("Finished reading grid parquet: {grid_file}"))
-  data
+  read_parquet_duckdb(grid_file)
 }
 
 read_grid_bins_parquet <- function(grid_bins_file) {
