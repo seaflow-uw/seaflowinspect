@@ -89,16 +89,6 @@ list_data_source_files <- function(data_sources) {
       gridded_files,
       value = TRUE
     )
-    # psd_gridded_files <- grep(
-    #   "/PSD/.*\\.hourly_gridded\\.parquet$",
-    #   gridded_files,
-    #   value = TRUE
-    # )
-    # psd_grid_files <- grep(
-    #   "/PSD/.*\\.grid_bins\\.parquet$",
-    #   grid_files,
-    #   value = TRUE
-    # )
 
     # Make sure we only find one unambiguous file per cruise for each data type,
     # within each data source.
@@ -161,16 +151,6 @@ list_data_source_files <- function(data_sources) {
       cruise = parse_cruise_from_filename(grid_gridded_files),
       grid_gridded_file = grid_gridded_files
     )
-    # psd_grid_tbl <- tibble::tibble(
-    #   name = name,
-    #   cruise = parse_cruise_from_filename(psd_grid_files),
-    #   psd_grid_file = psd_grid_files
-    # )
-    # psd_gridded_tbl <- tibble::tibble(
-    #   name = name,
-    #   cruise = parse_cruise_from_filename(psd_gridded_files),
-    #   psd_gridded_file = psd_gridded_files
-    # )
 
     dplyr::full_join(stat_tbl, outlier_tbl, by = c("name", "default", "cruise")) |>
       dplyr::full_join(bead_tbl, by = c("name", "default", "cruise")) |>

@@ -1,7 +1,7 @@
 Package: seaflowinspect
 Type: Shiny
 Title: SeaFlow Inspect
-Version: 0.3.0
+Version: 0.3.1
 Imports:
     arrow,
     duckdb,
