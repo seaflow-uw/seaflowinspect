@@ -38,21 +38,21 @@ list_data_source_files <- function(data_sources) {
 
   purrr::pmap(data_sources, function(name, dir, default) {
     outlier_dbs <- list.files(
-      file.path(dir, "results"),
+      dir,
       pattern = "\\.outlier\\.db$",
       recursive = TRUE,
       full.names = TRUE
     )
 
     bead_files <- list.files(
-      file.path(dir, "results"),
+      dir,
       pattern = "\\.beads-sample-.*\\.parquet$",
       recursive = TRUE,
       full.names = TRUE
     )
 
     vct_dirs <- list.files(
-      file.path(dir, "results"),
+      dir,
       pattern = "_vct$",
       recursive = TRUE,
       full.names = TRUE,
@@ -61,13 +61,13 @@ list_data_source_files <- function(data_sources) {
 
     # Find gridded data files
     grid_files <- list.files(
-      file.path(dir, "results"),
+      dir,
       pattern = "\\.grid_bins\\.parquet$",
       recursive = TRUE,
       full.names = TRUE
     )
     gridded_files <- list.files(
-      file.path(dir, "results"),
+      dir,
       pattern = "\\.hourly_gridded\\.parquet$",
       recursive = TRUE,
       full.names = TRUE
