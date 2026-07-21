@@ -19,7 +19,7 @@ server <- function(input, output, session) {
 
   # Update variation choices whenever cruise changes
   observe({
-    files <- all_data_source_files |>
+    files <- all_data_set_files |>
       filter(cruise == input$cruise) |>
       filter(!is.na(outlier_db)) |>
       distinct(name, default)
@@ -45,7 +45,7 @@ server <- function(input, output, session) {
   # Reactive expression for the currently selected files based on cruise and variation inputs
   selected_files <- reactive({
     req(input$cruise, input$variation)
-    files <- all_data_source_files |>
+    files <- all_data_set_files |>
       filter(cruise == input$cruise, name == input$variation)
 
     validate(need(nrow(files) > 0, "No files found for selected cruise and variation."))

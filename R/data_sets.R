@@ -1,5 +1,5 @@
 #' Find all <cruise> outlier db, bead sample parquet, and VCT dirs
-list_data_source_files <- function(data_sources) {
+list_data_set_files <- function(data_sets) {
   parse_cruise_from_filename <- function(paths) {
     sub("\\..*$", "", basename(paths))
   }
@@ -9,7 +9,7 @@ list_data_source_files <- function(data_sources) {
     sub("_(opp|vct)$", "", basename(paths))
   }
 
-  assert_unique_per_cruise <- function(paths, cruise_parser, source_type, name, dir) {
+  assert_unique_per_cruise <- function(paths, cruise_parser, data_type, name, dir) {
     if (length(paths) <= 1) {
       return(invisible(NULL))
     }
@@ -24,8 +24,8 @@ list_data_source_files <- function(data_sources) {
     duplicate_paths <- paths[cruises %in% duplicate_cruises]
     stop(
       paste0(
-        "Expected at most one ", source_type,
-        " per cruise in data source '", name,
+        "Expected at most one ", data_type,
+        " per cruise in data set '", name,
         "' (dir '", dir,
         "'), but found duplicates for cruise(s): ",
         paste(duplicate_cruises, collapse = ", "),
@@ -36,7 +36,7 @@ list_data_source_files <- function(data_sources) {
     )
   }
 
-  purrr::pmap(data_sources, function(name, dir, default) {
+  purrr::pmap(data_sets, function(name, dir, default) {
     outlier_dbs <- list.files(
       dir,
       pattern = "\\.outlier\\.db$",
@@ -79,7 +79,7 @@ list_data_source_files <- function(data_sources) {
     gridded_files <- grep("/grid/.*\\.hourly_gridded\\.parquet$", candidate_gridded_files, value = TRUE)
 
     # Make sure we only find one unambiguous file per cruise for each data type,
-    # within each data source.
+    # within each data set
     assert_unique_per_cruise(outlier_dbs, parse_cruise_from_filename, "outlier db", name, dir)
     assert_unique_per_cruise(bead_files, parse_cruise_from_filename, "bead file", name, dir)
     assert_unique_per_cruise(vct_dirs, parse_cruise_from_folder, "vct dir", name, dir)
@@ -139,4 +139,4 @@ list_data_source_files <- function(data_sources) {
     purrr::list_rbind()
 }
 
-all_data_source_files <- list_data_source_files(data_sources)
+all_data_set_files <- list_data_set_files(data_sets)

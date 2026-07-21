@@ -1,7 +1,7 @@
 ui <- bslib::page_sidebar(
   title = "SeaFlow Inspect",
   sidebar = bslib::sidebar(
-    shiny::selectInput("cruise", "Cruise", choices = sort(unique(all_data_source_files$cruise))),
+    shiny::selectInput("cruise", "Cruise", choices = sort(unique(all_data_set_files$cruise))),
     shiny::selectInput("variation", "Variation", choices = NULL),
     shiny::checkboxGroupInput("exclude_flags", "Exclude flags", choices = NULL),
     shiny::hr(),
