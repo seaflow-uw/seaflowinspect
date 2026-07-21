@@ -1,4 +1,4 @@
-#' Find all <cruise> stat parquet, outlier db, bead sample parquet, and VCT dirs
+#' Find all <cruise> outlier db, bead sample parquet, and VCT dirs
 list_data_source_files <- function(data_sources) {
   parse_cruise_from_filename <- function(paths) {
     sub("\\..*$", "", basename(paths))
@@ -37,13 +37,6 @@ list_data_source_files <- function(data_sources) {
   }
 
   purrr::pmap(data_sources, function(name, dir, default) {
-    stat_files <- list.files(
-      file.path(dir, "results"),
-      pattern = "\\.stat\\.parquet$",
-      recursive = TRUE,
-      full.names = TRUE
-    )
-
     outlier_dbs <- list.files(
       file.path(dir, "results"),
       pattern = "\\.outlier\\.db$",
@@ -92,31 +85,22 @@ list_data_source_files <- function(data_sources) {
 
     # Make sure we only find one unambiguous file per cruise for each data type,
     # within each data source.
-    assert_unique_per_cruise(stat_files, parse_cruise_from_filename, "stat file", name, dir)
     assert_unique_per_cruise(outlier_dbs, parse_cruise_from_filename, "outlier db", name, dir)
     assert_unique_per_cruise(bead_files, parse_cruise_from_filename, "bead file", name, dir)
     assert_unique_per_cruise(vct_dirs, parse_cruise_from_folder, "vct dir", name, dir)
     assert_unique_per_cruise(grid_grid_files, parse_cruise_from_filename, "grid bins file", name, dir)
     assert_unique_per_cruise(grid_gridded_files, parse_cruise_from_filename, "grid gridded file", name, dir)
 
-    if (length(stat_files) == 0 && length(outlier_dbs) == 0 && length(bead_files) == 0 && length(vct_dirs) == 0) {
+    if (length(outlier_dbs) == 0 && length(bead_files) == 0 && length(vct_dirs) == 0) {
       return(tibble::tibble(
         name = character(),
         default = logical(),
         cruise = character(),
-        stat_file = character(),
         outlier_db = character(),
         bead_file = character(),
         vct_dir = character()
       ))
     }
-
-    stat_tbl <- tibble::tibble(
-      name = name,
-      default = default,
-      cruise = parse_cruise_from_filename(stat_files),
-      stat_file = stat_files
-    )
 
     outlier_tbl <- tibble::tibble(
       name = name,
@@ -152,8 +136,7 @@ list_data_source_files <- function(data_sources) {
       grid_gridded_file = grid_gridded_files
     )
 
-    dplyr::full_join(stat_tbl, outlier_tbl, by = c("name", "default", "cruise")) |>
-      dplyr::full_join(bead_tbl, by = c("name", "default", "cruise")) |>
+    dplyr::full_join(outlier_tbl, bead_tbl, by = c("name", "default", "cruise")) |>
       dplyr::full_join(vct_tbl, by = c("name", "default", "cruise")) |>
       dplyr::full_join(grid_grid_tbl, by = c("name", "default", "cruise")) |>
       dplyr::full_join(grid_gridded_tbl, by = c("name", "default", "cruise"))

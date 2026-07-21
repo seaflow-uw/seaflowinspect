@@ -21,7 +21,7 @@ server <- function(input, output, session) {
   observe({
     files <- all_data_source_files |>
       filter(cruise == input$cruise) |>
-      filter(!is.na(stat_file)) |>
+      filter(!is.na(outlier_db)) |>
       distinct(name, default)
     choices <- setNames(files$name, files$name)
     default_choice <- files |>
@@ -54,8 +54,8 @@ server <- function(input, output, session) {
 
   # Read selected stat file into a tibble
   stat_data <- reactive({
-    req(!is.na(selected_files()$stat_file[[1]]))
-    read_stat_file(selected_files()$stat_file[[1]])
+    validate(need(!is.na(selected_files()$outlier_db[[1]]), "Stat data not yet available for this cruise/variation."))
+    read_stat_table(selected_files()$outlier_db[[1]])
   })
 
   # Stat data filtered according to user-selected flags to exclude
@@ -69,7 +69,7 @@ server <- function(input, output, session) {
 
   # Read selected outlier database SFL table
   sfl_data <- reactive({
-    req(!is.na(selected_files()$outlier_db[[1]]))
+    validate(need(!is.na(selected_files()$outlier_db[[1]]), "SFL data not yet available for this cruise/variation."))
     read_sfl_table(selected_files()$outlier_db[[1]])
   })
 
@@ -113,7 +113,7 @@ server <- function(input, output, session) {
   # Read selected filter parameters and cap final plan end_date at the
   # last available SFL timestamp.
   filter_params_data <- reactive({
-    req(!is.na(selected_files()$outlier_db[[1]]))
+    validate(need(!is.na(selected_files()$outlier_db[[1]]), "Filter parameters not yet available for this cruise/variation."))
     sfl_df <- sfl_data()
 
     read_filter_params(
@@ -146,7 +146,7 @@ server <- function(input, output, session) {
   # Read selected gating parameters and cap final plan end_date at the
   # last available SFL timestamp.
   gating_params_data <- reactive({
-    req(!is.na(selected_files()$outlier_db[[1]]))
+    validate(need(!is.na(selected_files()$outlier_db[[1]]), "Gating parameters not yet available for this cruise/variation."))
     sfl_df <- sfl_data()
 
     read_gating_params(
@@ -194,7 +194,7 @@ server <- function(input, output, session) {
   })
 
   bead_evt_data <- reactive({
-    req(!is.na(selected_files()$bead_file[[1]]))
+    validate(need(!is.na(selected_files()$bead_file[[1]]), "Bead sample data not yet available for this cruise/variation."))
     read_bead_sample(selected_files()$bead_file[[1]])
   })
 
@@ -253,7 +253,7 @@ server <- function(input, output, session) {
   }
 
   vct_hour_data <- reactive({
-    req(!is.na(selected_files()$vct_dir[[1]]))
+    validate(need(!is.na(selected_files()$vct_dir[[1]]), "VCT data not yet available for this cruise/variation."))
     req(!is.null(selected_x()))
 
     data <- tryCatch(
@@ -315,7 +315,7 @@ server <- function(input, output, session) {
   })
 
   gridded_data <- reactive({
-    req(!is.na(selected_files()$grid_gridded_file[[1]]))
+    validate(need(!is.na(selected_files()$grid_gridded_file[[1]]), "Gridded data not yet available for this cruise/variation."))
     grid <- grid_data()
     validate(need(nrow(grid) > 0, "Gridded data file contains no rows."))
     gridded <- read_grid_parquet(selected_files()$grid_gridded_file[[1]])
@@ -340,7 +340,7 @@ server <- function(input, output, session) {
   })
 
   grid_data <- reactive({
-    req(!is.na(selected_files()$grid_grid_file[[1]]))
+    validate(need(!is.na(selected_files()$grid_grid_file[[1]]), "Grid bins data not yet available for this cruise/variation."))
     read_grid_bins_parquet(selected_files()$grid_grid_file[[1]])
   })
 

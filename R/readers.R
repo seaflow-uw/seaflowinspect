@@ -45,8 +45,8 @@ read_sfl_table <- function(db_file) {
     dplyr::arrange(time)
 }
 
-read_stat_file <- function(stat_file) {
-  read_parquet_duckdb(stat_file) |>
+read_stat_table <- function(db_file) {
+  stat <- as_tibble(popcycle::get_stat_table(db_file)) |>
     dplyr::filter(quantile == QUANTILE) |>
     dplyr::select(
       time,
