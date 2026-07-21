@@ -59,37 +59,32 @@ list_data_source_files <- function(data_sources) {
       include.dirs = TRUE
     )
 
-    # Find gridded data files
-    grid_files <- list.files(
+    # Find gridded data files. The "grid" parent dir can occur at varying
+    # depths under dir, so list.files' pattern (which only matches basename)
+    # can't select for it directly -- filter the candidate paths afterward.
+    candidate_grid_files <- list.files(
       dir,
       pattern = "\\.grid_bins\\.parquet$",
       recursive = TRUE,
       full.names = TRUE
     )
-    gridded_files <- list.files(
+    grid_files <- grep("/grid/.*\\.grid_bins\\.parquet$", candidate_grid_files, value = TRUE)
+
+    candidate_gridded_files <- list.files(
       dir,
       pattern = "\\.hourly_gridded\\.parquet$",
       recursive = TRUE,
       full.names = TRUE
     )
-    grid_grid_files <- grep(
-      "/grid/.*\\.grid_bins\\.parquet$",
-      grid_files,
-      value = TRUE
-    )
-    grid_gridded_files <- grep(
-      "/grid/.*\\.hourly_gridded\\.parquet$",
-      gridded_files,
-      value = TRUE
-    )
+    gridded_files <- grep("/grid/.*\\.hourly_gridded\\.parquet$", candidate_gridded_files, value = TRUE)
 
     # Make sure we only find one unambiguous file per cruise for each data type,
     # within each data source.
     assert_unique_per_cruise(outlier_dbs, parse_cruise_from_filename, "outlier db", name, dir)
     assert_unique_per_cruise(bead_files, parse_cruise_from_filename, "bead file", name, dir)
     assert_unique_per_cruise(vct_dirs, parse_cruise_from_folder, "vct dir", name, dir)
-    assert_unique_per_cruise(grid_grid_files, parse_cruise_from_filename, "grid bins file", name, dir)
-    assert_unique_per_cruise(grid_gridded_files, parse_cruise_from_filename, "grid gridded file", name, dir)
+    assert_unique_per_cruise(grid_files, parse_cruise_from_filename, "grid bins file", name, dir)
+    assert_unique_per_cruise(gridded_files, parse_cruise_from_filename, "grid gridded file", name, dir)
 
     if (length(outlier_dbs) == 0 && length(bead_files) == 0 && length(vct_dirs) == 0) {
       return(tibble::tibble(
@@ -123,23 +118,23 @@ list_data_source_files <- function(data_sources) {
       vct_dir = vct_dirs
     )
 
-    grid_grid_tbl <- tibble::tibble(
+    grid_tbl <- tibble::tibble(
       name = name,
       default = default,
-      cruise = parse_cruise_from_filename(grid_grid_files),
-      grid_grid_file = grid_grid_files
+      cruise = parse_cruise_from_filename(grid_files),
+      grid_file = grid_files
     )
-    grid_gridded_tbl <- tibble::tibble(
+    gridded_tbl <- tibble::tibble(
       name = name,
       default = default,
-      cruise = parse_cruise_from_filename(grid_gridded_files),
-      grid_gridded_file = grid_gridded_files
+      cruise = parse_cruise_from_filename(gridded_files),
+      gridded_file = gridded_files
     )
 
     dplyr::full_join(outlier_tbl, bead_tbl, by = c("name", "default", "cruise")) |>
       dplyr::full_join(vct_tbl, by = c("name", "default", "cruise")) |>
-      dplyr::full_join(grid_grid_tbl, by = c("name", "default", "cruise")) |>
-      dplyr::full_join(grid_gridded_tbl, by = c("name", "default", "cruise"))
+      dplyr::full_join(grid_tbl, by = c("name", "default", "cruise")) |>
+      dplyr::full_join(gridded_tbl, by = c("name", "default", "cruise"))
   }) |>
     purrr::list_rbind()
 }

@@ -315,10 +315,10 @@ server <- function(input, output, session) {
   })
 
   gridded_data <- reactive({
-    validate(need(!is.na(selected_files()$grid_gridded_file[[1]]), "Gridded data not yet available for this cruise/variation."))
+    validate(need(!is.na(selected_files()$gridded_file[[1]]), "Gridded data not yet available for this cruise/variation."))
     grid <- grid_data()
     validate(need(nrow(grid) > 0, "Gridded data file contains no rows."))
-    gridded <- read_grid_parquet(selected_files()$grid_gridded_file[[1]])
+    gridded <- read_grid_parquet(selected_files()$gridded_file[[1]])
     # Replace grid bin numbers with bin starts
     gridded <- gridded |>
       dplyr::mutate(
@@ -340,8 +340,8 @@ server <- function(input, output, session) {
   })
 
   grid_data <- reactive({
-    validate(need(!is.na(selected_files()$grid_grid_file[[1]]), "Grid bins data not yet available for this cruise/variation."))
-    read_grid_bins_parquet(selected_files()$grid_grid_file[[1]])
+    validate(need(!is.na(selected_files()$grid_file[[1]]), "Grid bins data not yet available for this cruise/variation."))
+    read_grid_bins_parquet(selected_files()$grid_file[[1]])
   })
 
   sflPlotServer(
