@@ -86,11 +86,12 @@ plot_vct_cytogram <- function(df, x = "fsc_small", y = "chl_small",
 
   if (transform) {
     p <- p +
-      ggplot2::scale_y_continuous(trans="log10", limits=ylim) +
-      ggplot2::scale_x_continuous(trans="log10", limits=xlim)
+      ggplot2::scale_y_continuous(trans="log10") +
+      ggplot2::scale_x_continuous(trans="log10") +
+      ggplot2::coord_cartesian(xlim=xlim, ylim=ylim)
   } else {
     p <- p +
-      ggplot2::scale_y_continuous(limits=ylim) + ggplot2::scale_x_continuous(limits=xlim)
+      ggplot2::coord_cartesian(xlim=xlim, ylim=ylim)
   }
 
   # Draw gating polygons if provided
