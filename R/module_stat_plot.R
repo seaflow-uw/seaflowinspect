@@ -17,7 +17,8 @@ statPlotUI <- function(id) {
           "phycoerythrin" = "pe_med",
           "Count" = "n_count",
           "OPP/EVT ratio" = "opp_evt_ratio"
-        ))
+        )),
+        shiny::checkboxInput(ns("aggregate_hourly"), "Aggregate by hour", value = FALSE)
       ),
       plotly::plotlyOutput(ns("plot"), height = paste0(STAT_PLOT_VH, "vh"))
     )
@@ -51,9 +52,30 @@ statPlotServer <- function(
         filtered_stat_data() |> filter(pop == input$pop)
       })
 
+      # Optionally collapse to one row per hour. n_count is summed since it's
+      # a count of particles seen per timepoint; every other metric is
+      # medianed across the hour.
+      plot_stat_data <- reactive({
+        df <- pop_stat_data()
+        if (!isTRUE(input$aggregate_hourly)) {
+          return(df)
+        }
+        df |>
+          mutate(time = lubridate::floor_date(time, unit = "hour")) |>
+          group_by(time, pop) |>
+          summarise(
+            across(
+              c(opp_evt_ratio, abundance, fsc_med, chl_med, pe_med, diameter),
+              ~median(.x, na.rm = TRUE)
+            ),
+            n_count = sum(n_count, na.rm = TRUE),
+            .groups = "drop"
+          )
+      })
+
       output$plot <- renderPlotly({
         req(input$metric)
-        df <- pop_stat_data()
+        df <- plot_stat_data()
         metric_label <- names(which(c(
           "OPP/EVT ratio" = "opp_evt_ratio",
           "Abundance" = "abundance",
@@ -63,13 +85,15 @@ statPlotServer <- function(
 
         validate(need(nrow(df) > 0, "No rows to plot for current filters."))
 
+        marker_size <- if (isTRUE(input$aggregate_hourly)) 6 else 3
+
         plot_ly(
           data = df,
           x = ~time,
           y = as.formula(paste0("~", input$metric)),
           type = "scatter",
           mode = "markers",
-          marker = list(size = 3)
+          marker = list(size = marker_size)
         ) |>
           layout(
             xaxis = list(title = "Time", range = x_range()),
